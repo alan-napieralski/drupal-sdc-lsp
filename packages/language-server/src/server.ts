@@ -46,8 +46,15 @@ const registry = new SDCRegistry();
 
 let workspaceRoot: string | null = null;
 let disposeWatcher: (() => void) | null = null;
+let enableGenericSnippets = true;
 
 connection.onInitialize((params) => {
+  // Read initializationOptions
+  const initOptions = params.initializationOptions as Record<string, unknown> | undefined;
+  if (initOptions?.enableGenericTwigSnippets === false) {
+    enableGenericSnippets = false;
+  }
+
   // Resolve workspace root from workspaceFolders or rootUri (never rootPath)
   if (params.workspaceFolders && params.workspaceFolders.length > 0) {
     const firstFolder = params.workspaceFolders[0];
@@ -110,7 +117,7 @@ connection.onInitialized(() => {
 
 connection.onCompletion(async (params, token) => {
   try {
-    return await getCompletions(params, documents, registry, logger, token);
+    return await getCompletions(params, documents, registry, logger, token, enableGenericSnippets);
   } catch (err) {
     logger.error(`Completion handler error: ${String(err)}`);
     return [];

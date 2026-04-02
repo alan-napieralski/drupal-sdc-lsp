@@ -29,11 +29,15 @@ const INCLUDE_CONTEXT_PATTERN = /(?:include|embed|extends)\s*['"]([^'"]*)$/i;
 const COMMENT_LINE_PATTERN = /^\s*\{#/;
 
 /**
- * Early shorthand prefixes — not yet long enough to match WORD_SHORTHAND_PATTERN
- * but are plausible starts of a Twig shorthand. Returning isIncomplete:true here
- * prevents blink.cmp from caching the empty result and blocking later requests.
+ * Early shorthand prefixes — a single character that could grow into a Twig
+ * shorthand but doesn't yet match WORD_SHORTHAND_PATTERN (which requires 2 chars).
+ * Returning isIncomplete:true here prevents blink.cmp from caching the empty
+ * result and blocking requests once the user types the second character.
+ *
+ * Covers first letters of: apply, block, cache, embed/extends, filter, for/from,
+ * if/include/import, macro, set, trans, use, verbatim, with.
  */
-const EARLY_SHORTHAND_PREFIX = /(?<![%{-])\b([ie][mn]?)$/i;
+const EARLY_SHORTHAND_PREFIX = /(?<![%{-])\b([abcefimstuvw])$/i;
 
 /**
  * Returns completion items for the current cursor position in a Twig document.
@@ -57,6 +61,7 @@ export async function getCompletions(
   registry: SDCRegistry,
   logger: Logger,
   token: CancellationToken,
+  enableGenericSnippets: boolean = true,
 ): Promise<CompletionItem[]> {
   const doc = documents.get(params.textDocument.uri);
   if (doc === undefined) return [];
@@ -81,7 +86,7 @@ export async function getCompletions(
   // Branch 1: inside `{%` tag opener — Twig tag snippets
   // Runs synchronously, no await, no staleness risk.
   // ------------------------------------------------------------------
-  const tagSnippets = getTwigTagSnippets(lineUpToCursor, lineAfterCursor, lineNumber);
+  const tagSnippets = getTwigTagSnippets(lineUpToCursor, lineAfterCursor, lineNumber, enableGenericSnippets);
   if (tagSnippets.length > 0) return tagSnippets;
 
   // ------------------------------------------------------------------
@@ -90,7 +95,7 @@ export async function getCompletions(
   // Returns isIncomplete:true so blink.cmp never caches these and always
   // re-requests as the user continues typing.
   // ------------------------------------------------------------------
-  const wordSnippets = getTwigWordSnippets(lineUpToCursor, lineNumber);
+  const wordSnippets = getTwigWordSnippets(lineUpToCursor, lineNumber, enableGenericSnippets);
   if (wordSnippets.length > 0) {
     return CompletionList.create(wordSnippets, true);
   }

@@ -98,7 +98,40 @@ lspconfig.drupal_sdc_ls.setup({})
 
 ---
 
-## 4. Three-Server Coexistence
+## 4. Configuration Options
+
+`drupal-sdc-lsp` accepts options via `init_options` (passed as `initializationOptions` in the LSP handshake):
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enableGenericTwigSnippets` | `boolean` | `true` | Include generic Twig snippets (if/for/block/set/macro etc.) in completions |
+
+**When to disable `enableGenericTwigSnippets`**: If you use `twiggy_language_server` alongside `drupal-sdc-lsp`, both servers provide generic Twig snippets. Set this to `false` to defer to twiggy for generic snippets and avoid duplicates.
+
+> **Note:** Disabling this option does **not** remove SDC-specific snippets. `include`, `include with`, `embed`, `embed with`, and `extends` are always available — these fill gaps that `twiggy_language_server` does not cover (twiggy's `include` uses function syntax only; `embed` and `with` variants are absent).
+
+```lua
+-- nvim-lspconfig: disable generic snippets when running alongside twiggy
+lspconfig.drupal_sdc_ls.setup({
+  init_options = {
+    enableGenericTwigSnippets = false,
+  },
+})
+
+-- vim.lsp.config style (Neovim >= 0.11)
+vim.lsp.config('drupal_sdc_ls', {
+  cmd = { 'drupal-sdc-lsp', '--stdio' },
+  filetypes = { 'twig' },
+  root_markers = { 'composer.json', 'docroot', '.git' },
+  init_options = {
+    enableGenericTwigSnippets = false,
+  },
+})
+```
+
+---
+
+## 5. Three-Server Coexistence
 
 For a full Drupal SDC development environment, run all three servers simultaneously:
 
@@ -221,7 +254,7 @@ When multiple servers are attached to the same buffer, the editor merges their c
 
 ---
 
-## 5. Drupal SDC Schema URL
+## 6. Drupal SDC Schema URL
 
 For reference, the official Drupal SDC JSON Schema used for `.component.yml` validation is:
 
@@ -231,7 +264,7 @@ https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/meta
 
 ---
 
-## 6. Debugging
+## 7. Debugging
 
 ### Check server status
 
