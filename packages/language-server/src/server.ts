@@ -17,6 +17,7 @@ import { getCompletions, resolveCompletion } from './completion.js';
 import { getDefinition } from './definition.js';
 import { getHover } from './hover.js';
 import { setupWatcher } from './watcher.js';
+import { getSemanticTokens, SEMANTIC_TOKEN_LEGEND } from './semantic-tokens.js';
 
 // Validate CLI arguments — only --stdio is accepted
 const knownFlags = new Set(['--stdio']);
@@ -80,6 +81,10 @@ connection.onInitialize((params) => {
       },
       definitionProvider: true,
       hoverProvider: true,
+      semanticTokensProvider: {
+        legend: SEMANTIC_TOKEN_LEGEND,
+        full: true,
+      },
     },
   };
 });
@@ -148,6 +153,15 @@ connection.onHover(async (params) => {
   } catch (err) {
     logger.error(`Hover handler error: ${String(err)}`);
     return null;
+  }
+});
+
+connection.languages.semanticTokens.on((params) => {
+  try {
+    return getSemanticTokens(params, documents);
+  } catch (err) {
+    logger.error(`SemanticTokens handler error: ${String(err)}`);
+    return { data: [] };
   }
 });
 
