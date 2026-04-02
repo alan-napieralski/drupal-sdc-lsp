@@ -1,0 +1,10 @@
+{
+  "name": "drupal-sdc-lsp-vscode",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'vscode-client: skipped in Phase 1'",
+    "dev": "echo 'vscode-client: skipped in Phase 1'",
+    "clean": "rm -rf dist"
+  }
+}

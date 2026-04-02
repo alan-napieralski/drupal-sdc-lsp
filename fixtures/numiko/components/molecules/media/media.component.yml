@@ -1,0 +1,14 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Media
+description: Embeds a media entity with optional caption.
+props:
+  type: object
+  properties:
+    media_entity:
+      type: object
+      description: Drupal media entity render array
+    caption:
+      type: string
+      description: Optional caption text
+  required:
+    - media_entity

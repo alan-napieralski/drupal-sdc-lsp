@@ -1,0 +1,27 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Card
+description: Content card with image, title, and body text.
+props:
+  type: object
+  properties:
+    title:
+      type: string
+      description: Card title
+    url:
+      type: string
+      description: Link URL for the card
+    image_src:
+      type: string
+      description: Card image source
+    image_alt:
+      type: string
+      description: Card image alt text
+  required:
+    - title
+slots:
+  body:
+    title: Body
+    description: Main body content of the card
+  footer:
+    title: Footer
+    description: Optional card footer content

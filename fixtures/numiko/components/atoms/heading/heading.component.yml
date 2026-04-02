@@ -1,0 +1,18 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Heading
+description: Semantic heading element with configurable level and style.
+props:
+  type: object
+  properties:
+    text:
+      type: string
+      description: The heading text content
+    level:
+      type: integer
+      description: HTML heading level (1-6)
+    style_level:
+      type: integer
+      description: Visual style level, independent of semantic level
+  required:
+    - text
+    - level

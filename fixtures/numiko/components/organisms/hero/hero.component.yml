@@ -1,0 +1,24 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Hero
+description: Full-width hero banner with heading, subheading, and call to action.
+props:
+  type: object
+  properties:
+    heading:
+      type: string
+      description: Main hero heading
+    subheading:
+      type: string
+      description: Secondary heading text
+    background_image:
+      type: string
+      description: Background image URL
+  required:
+    - heading
+slots:
+  cta:
+    title: Call to Action
+    description: CTA button or link content
+  media:
+    title: Media
+    description: Optional foreground media

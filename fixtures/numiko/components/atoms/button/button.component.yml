@@ -1,0 +1,26 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Button
+description: A clickable button component with variants and sizes.
+props:
+  type: object
+  properties:
+    label:
+      type: string
+      description: The button label text
+    variant:
+      type: string
+      description: "Visual variant: primary, secondary, or ghost"
+      enum: [primary, secondary, ghost]
+    size:
+      type: string
+      description: "Size: sm, md, or lg"
+      enum: [sm, md, lg]
+    disabled:
+      type: boolean
+      description: Whether the button is disabled
+  required:
+    - label
+slots:
+  icon:
+    title: Icon slot
+    description: Optional icon to display alongside the label

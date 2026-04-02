@@ -1,0 +1,10 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Footer
+description: Site footer. Has no props — only slots.
+slots:
+  links:
+    title: Links
+    description: Footer navigation links
+  legal:
+    title: Legal
+    description: Legal/copyright text

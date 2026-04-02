@@ -1,0 +1,19 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Image
+description: Responsive image with optional caption. No props, no slots example.
+props:
+  type: object
+  properties:
+    src:
+      type: string
+      description: Image source URL
+    alt:
+      type: string
+      description: Alt text for accessibility
+    width:
+      type: integer
+    height:
+      type: integer
+  required:
+    - src
+    - alt
