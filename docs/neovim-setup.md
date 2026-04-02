@@ -30,7 +30,7 @@ drupal-sdc-lsp --stdio
 ### Option B: Local development build
 
 ```bash
-cd /path/to/numiko-lsp
+cd /path/to/drupal-sdc-lsp
 pnpm install
 pnpm build
 ```
@@ -55,7 +55,7 @@ vim.lsp.config('drupal_sdc_ls', {
 
 -- Option B: local development build (uncomment and set your path)
 -- vim.lsp.config('drupal_sdc_ls', {
---   cmd = { 'node', '/absolute/path/to/numiko-lsp/packages/language-server/dist/server.cjs', '--stdio' },
+--   cmd = { 'node', '/absolute/path/to/drupal-sdc-lsp/packages/language-server/dist/server.cjs', '--stdio' },
 --   filetypes = { 'twig' },
 --   root_markers = { 'composer.json', 'docroot', '.git' },
 -- })
@@ -84,7 +84,7 @@ if not configs.drupal_sdc_ls then
       cmd = { 'drupal-sdc-lsp', '--stdio' },
 
       -- Option B: local dev build
-      -- cmd = { 'node', '/absolute/path/to/numiko-lsp/packages/language-server/dist/server.cjs', '--stdio' },
+      -- cmd = { 'node', '/absolute/path/to/drupal-sdc-lsp/packages/language-server/dist/server.cjs', '--stdio' },
 
       filetypes = { 'twig' },
       root_dir = lspconfig.util.root_pattern('composer.json', 'docroot', '.git'),
@@ -171,8 +171,8 @@ lspconfig.twiggy_language_server.setup({
   init_options = {
     namespaces = {
       {
-        label = 'numiko',
-        paths = { 'web/themes/custom/numiko/components' },
+        label = 'mytheme',
+        paths = { 'web/themes/custom/mytheme/components' },
       },
     },
   },
@@ -218,8 +218,8 @@ vim.lsp.config('twiggy_language_server', {
   init_options = {
     namespaces = {
       {
-        label = 'numiko',
-        paths = { 'web/themes/custom/numiko/components' },
+        label = 'mytheme',
+        paths = { 'web/themes/custom/mytheme/components' },
       },
     },
   },
@@ -294,7 +294,7 @@ This opens the LSP log file. Look for errors from `drupal-sdc-lsp`. Common log m
 2. Check `:LspLog` for any errors
 3. Verify the server is built: `node /path/to/dist/server.cjs --stdio` should start without errors
 4. Check that your `root_dir`/`root_markers` pattern matches your project — the server needs to detect a workspace root to scan for components
-5. Confirm your components are in a `components/` directory (e.g. `web/themes/custom/numiko/components/`)
+5. Confirm your components are in a `components/` directory (e.g. `web/themes/custom/mytheme/components/`)
 
 **Server not attaching**
 

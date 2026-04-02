@@ -21,9 +21,9 @@ export interface SlotDefinition {
  * Fully-parsed metadata for a single Drupal SDC component.
  */
 export interface ComponentMetadata {
-  /** Machine ID in "provider:componentName" format, e.g. "numiko:wysiwyg" */
+  /** Machine ID in "provider:componentName" format, e.g. "example:wysiwyg" */
   id: string;
-  /** Provider name inferred from directory structure, e.g. "numiko" */
+  /** Provider name inferred from directory structure, e.g. "example" */
   provider: string;
   /** Human-readable name from the YAML `name` field */
   name: string;

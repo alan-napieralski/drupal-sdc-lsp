@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'path';
 import { parseComponentYaml } from '../parser.js';
 
-const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/numiko/components');
+const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/example/components');
 
 describe('parseComponentYaml', () => {
   describe('valid components', () => {
@@ -11,8 +11,8 @@ describe('parseComponentYaml', () => {
       const result = await parseComponentYaml(filePath);
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe('numiko:button');
-      expect(result!.provider).toBe('numiko');
+      expect(result!.id).toBe('example:button');
+      expect(result!.provider).toBe('example');
       expect(result!.name).toBe('Button');
       expect(result!.description).toBe('A clickable button component with variants and sizes.');
     });
@@ -63,7 +63,7 @@ describe('parseComponentYaml', () => {
       const result = await parseComponentYaml(filePath);
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe('numiko:wysiwyg');
+      expect(result!.id).toBe('example:wysiwyg');
       expect(result!.props).toEqual([]);
       expect(result!.slots.length).toBeGreaterThan(0);
     });
@@ -146,10 +146,10 @@ describe('parseComponentYaml', () => {
   });
 
   describe('provider inference', () => {
-    it('infers provider as "numiko" from fixture paths', async () => {
+    it('infers provider as "example" from fixture paths', async () => {
       const filePath = path.join(FIXTURES_DIR, 'atoms/button/button.component.yml');
       const result = await parseComponentYaml(filePath);
-      expect(result!.provider).toBe('numiko');
+      expect(result!.provider).toBe('example');
     });
   });
 });

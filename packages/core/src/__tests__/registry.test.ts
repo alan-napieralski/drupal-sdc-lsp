@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as path from 'path';
 import { SDCRegistry, buildRegistry } from '../registry.js';
 
-const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/numiko');
+const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/example');
 
 describe('SDCRegistry', () => {
   let registry: SDCRegistry;
@@ -29,23 +29,23 @@ describe('SDCRegistry', () => {
 
   describe('getById()', () => {
     it('returns button component by ID', () => {
-      const component = registry.getById('numiko:button');
+      const component = registry.getById('example:button');
       expect(component).toBeDefined();
       expect(component!.name).toBe('Button');
     });
 
     it('returns card component by ID', () => {
-      const component = registry.getById('numiko:card');
+      const component = registry.getById('example:card');
       expect(component).toBeDefined();
     });
 
     it('returns wysiwyg component by ID', () => {
-      const component = registry.getById('numiko:wysiwyg');
+      const component = registry.getById('example:wysiwyg');
       expect(component).toBeDefined();
     });
 
     it('returns undefined for unknown ID', () => {
-      const component = registry.getById('numiko:nonexistent');
+      const component = registry.getById('example:nonexistent');
       expect(component).toBeUndefined();
     });
 
@@ -56,8 +56,8 @@ describe('SDCRegistry', () => {
   });
 
   describe('getByProvider()', () => {
-    it('returns all components for the numiko provider', () => {
-      const components = registry.getByProvider('numiko');
+    it('returns all components for the example provider', () => {
+      const components = registry.getByProvider('example');
       expect(components.length).toBe(9);
     });
 
@@ -70,17 +70,17 @@ describe('SDCRegistry', () => {
   describe('search()', () => {
     it('finds card component by partial ID', () => {
       const results = registry.search('card');
-      expect(results.some((c) => c.id === 'numiko:card')).toBe(true);
+      expect(results.some((c) => c.id === 'example:card')).toBe(true);
     });
 
     it('finds button component case-insensitively', () => {
       const results = registry.search('BUTTON');
-      expect(results.some((c) => c.id === 'numiko:button')).toBe(true);
+      expect(results.some((c) => c.id === 'example:button')).toBe(true);
     });
 
     it('finds by name fragment', () => {
       const results = registry.search('wysiwyg');
-      expect(results.some((c) => c.id === 'numiko:wysiwyg')).toBe(true);
+      expect(results.some((c) => c.id === 'example:wysiwyg')).toBe(true);
     });
 
     it('returns [] for no matches', () => {
@@ -103,24 +103,24 @@ describe('SDCRegistry', () => {
 
     it('includes expected component IDs', () => {
       const ids = registry.getAllComponents().map((c) => c.id);
-      expect(ids).toContain('numiko:button');
-      expect(ids).toContain('numiko:card');
-      expect(ids).toContain('numiko:wysiwyg');
-      expect(ids).toContain('numiko:hero');
-      expect(ids).toContain('numiko:footer');
-      expect(ids).toContain('numiko:icon');
+      expect(ids).toContain('example:button');
+      expect(ids).toContain('example:card');
+      expect(ids).toContain('example:wysiwyg');
+      expect(ids).toContain('example:hero');
+      expect(ids).toContain('example:footer');
+      expect(ids).toContain('example:icon');
     });
   });
 
   describe('removeComponent()', () => {
     it('removes a component from the registry', async () => {
       const localRegistry = await buildRegistry(FIXTURES_DIR);
-      const button = localRegistry.getById('numiko:button');
+      const button = localRegistry.getById('example:button');
       expect(button).toBeDefined();
 
       localRegistry.removeComponent(button!.yamlFilePath);
 
-      expect(localRegistry.getById('numiko:button')).toBeUndefined();
+      expect(localRegistry.getById('example:button')).toBeUndefined();
       expect(localRegistry.getAllComponents().length).toBe(8);
     });
 
@@ -132,12 +132,12 @@ describe('SDCRegistry', () => {
   describe('updateComponent()', () => {
     it('updates an existing component entry', async () => {
       const localRegistry = await buildRegistry(FIXTURES_DIR);
-      const buttonPath = localRegistry.getById('numiko:button')!.yamlFilePath;
+      const buttonPath = localRegistry.getById('example:button')!.yamlFilePath;
 
       // Re-parse the same file — should not throw and should keep the component
       await localRegistry.updateComponent(buttonPath);
 
-      const updated = localRegistry.getById('numiko:button');
+      const updated = localRegistry.getById('example:button');
       expect(updated).toBeDefined();
       expect(updated!.name).toBe('Button');
     });
@@ -163,14 +163,14 @@ describe('SDCRegistry', () => {
 
   describe('getByNamespacePath()', () => {
     it('returns a component by namespace path', () => {
-      // The namespace path is @numiko/atoms/button/button.twig
-      const component = registry.getByNamespacePath('@numiko/atoms/button/button.twig');
+      // The namespace path is @example/atoms/button/button.twig
+      const component = registry.getByNamespacePath('@example/atoms/button/button.twig');
       expect(component).toBeDefined();
-      expect(component!.id).toBe('numiko:button');
+      expect(component!.id).toBe('example:button');
     });
 
     it('returns undefined for unknown namespace path', () => {
-      const result = registry.getByNamespacePath('@numiko/nonexistent.twig');
+      const result = registry.getByNamespacePath('@example/nonexistent.twig');
       expect(result).toBeUndefined();
     });
   });

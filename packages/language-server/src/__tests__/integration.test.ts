@@ -5,7 +5,7 @@ import * as child_process from 'child_process';
 import { URI } from 'vscode-uri';
 
 const SERVER_DIST = path.resolve(process.cwd(), 'packages/language-server/dist/server.js');
-const FIXTURES_DIR = path.resolve(process.cwd(), 'fixtures/numiko');
+const FIXTURES_DIR = path.resolve(process.cwd(), 'fixtures/example');
 
 // ---------------------------------------------------------------------------
 // Minimal JSON-RPC over stdio helpers
@@ -230,8 +230,8 @@ describe('LSP integration tests', () => {
       expect(items.length).toBeGreaterThan(0);
 
       const labels = items.map((item) => item.label);
-      expect(labels).toContain('numiko:button');
-      expect(labels).toContain('numiko:card');
+      expect(labels).toContain('example:button');
+      expect(labels).toContain('example:card');
 
       await client.request('shutdown', undefined);
       client.notify('exit', undefined);
@@ -255,13 +255,13 @@ describe('LSP integration tests', () => {
       await sleep(800);
 
       const docUri = URI.file('/tmp/test-definition.twig').toString();
-      const docText = "{% include 'numiko:card' %}";
+      const docText = "{% include 'example:card' %}";
 
       client.notify('textDocument/didOpen', {
         textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
       });
 
-      // Cursor at character 15 — inside "numiko:card"
+      // Cursor at character 15 — inside "example:card"
       const definitionResponse = await client.request('textDocument/definition', {
         textDocument: { uri: docUri },
         position: { line: 0, character: 15 },
@@ -296,7 +296,7 @@ describe('LSP integration tests', () => {
       await sleep(800);
 
       const docUri = URI.file('/tmp/test-unknown.twig').toString();
-      const docText = "{% include 'numiko:nonexistent' %}";
+      const docText = "{% include 'example:nonexistent' %}";
 
       client.notify('textDocument/didOpen', {
         textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },

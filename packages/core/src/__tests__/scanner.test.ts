@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { scanForComponentFiles } from '../scanner.js';
 
-const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/numiko');
+const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/example');
 
 describe('scanForComponentFiles', () => {
   it('returns all .component.yml paths from the fixtures directory', async () => {

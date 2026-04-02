@@ -31,8 +31,8 @@ The server is a **stdio LSP process**, making it editor-agnostic by design. It h
 
 When writing Twig templates in a Drupal SDC project, developers face a tooling gap that makes even basic component usage friction-heavy:
 
-- `{% include 'numiko:wysiwyg' %}` is a valid Drupal SDC include, but every general-purpose Twig LSP reports it as a "template not found" error because it does not understand the `provider:component` ID format.
-- There is no autocomplete for SDC component IDs (`numiko:wysiwyg`, `numiko:card`) or for Twig namespace paths (`@numiko/atoms/button/button.twig`).
+- `{% include 'example:wysiwyg' %}` is a valid Drupal SDC include, but every general-purpose Twig LSP reports it as a "template not found" error because it does not understand the `provider:component` ID format.
+- There is no autocomplete for SDC component IDs (`example:wysiwyg`, `example:card`) or for Twig namespace paths (`@example/atoms/button/button.twig`).
 - There is no IntelliSense for props and slots declared in `.component.yml` files &mdash; developers must open the YAML file manually to see what a component accepts.
 - There are no hover docs. Hovering over a component reference shows nothing.
 
@@ -129,7 +129,7 @@ numiko-lsp/
 &boxur;&boxh;
 &boxur;&boxh;&boxh; fixtures/
 &boxur;&boxh;   &boxur;&boxh;&boxh; README.md
-&boxur;&boxh;   &boxur;&boxh;&boxh; numiko/
+&boxur;&boxh;   &boxur;&boxh;&boxh; example/
 &boxur;&boxh;       &boxur;&boxh;&boxh; atoms/
 &boxur;&boxh;       &boxur;&boxh;&boxh; molecules/
 &boxur;&boxh;       &boxur;&boxh;&boxh; organisms/
@@ -232,7 +232,7 @@ server.ts: createConnection(ProposedFeatures.all) before any stdout output
 
 ### Phase 1 &mdash; Foundation: SDC Indexing, Component ID Completion, Go-to-Definition
 
-**Goal:** A working stdio LSP that a Neovim developer can connect to today and immediately get `numiko:component-name` autocompletion and go-to-definition in their Twig templates for a single workspace root.
+**Goal:** A working stdio LSP that a Neovim developer can connect to today and immediately get `example:component-name` autocompletion and go-to-definition in their Twig templates for a single workspace root.
 
 **Deliverables:**
 - Monorepo scaffold with build tooling and TypeScript project references
@@ -244,7 +244,7 @@ server.ts: createConnection(ProposedFeatures.all) before any stdout output
 - Go-to-definition: cursor on component ID &rarr; navigate to `.twig` file
 - File watcher: debounced incremental re-index on `.component.yml` changes
 - Neovim setup guide in `docs/neovim-setup.md`
-- Fixture files from `pas-drupal` in `fixtures/numiko/`
+- Fixture files from `pas-drupal` in `fixtures/example/`
 - Unit tests for all `packages/core` modules
 - Integration test for full LSP completion request/response cycle
 
@@ -268,8 +268,8 @@ server.ts: createConnection(ProposedFeatures.all) before any stdout output
 - Hover provider: component name, description, props table, slots list in Markdown
 
 **Definition of Done:**
-- Typing `@numiko/` in a Twig string produces completions for all matching Twig files
-- Hovering over `numiko:card` shows the component&rsquo;s name, description, props table, and slots list
+- Typing `@example/` in a Twig string produces completions for all matching Twig files
+- Hovering over `example:card` shows the component&rsquo;s name, description, props table, and slots list
 - Hover over a component with no props/slots shows a graceful fallback message
 - All Phase 1 tests continue to pass
 - No new crashes or unhandled errors during a Neovim session
@@ -286,10 +286,10 @@ server.ts: createConnection(ProposedFeatures.all) before any stdout output
 - Diagnostic provider: warning on `provider:component` ID strings not found in the registry
 
 **Definition of Done:**
-- Typing `{% include 'numiko:card' with { ` produces prop key completions from `card.component.yml`
+- Typing `{% include 'example:card' with { ` produces prop key completions from `card.component.yml`
 - Required props appear before optional ones in the completion list
 - Already-typed keys are excluded from suggestions
-- An unknown component ID like `numiko:nonexistent` gets a warning diagnostic with a clear message
+- An unknown component ID like `example:nonexistent` gets a warning diagnostic with a clear message
 - No false-positive diagnostics are emitted during startup because diagnostic passes wait for the initial readiness gate before resolving IDs
 - All Phase 1 and 2 tests continue to pass
 
@@ -411,7 +411,7 @@ This section defines non-negotiable behaviour for the server. Every task in Sect
 
 **Fixture requirements:**
 - All tests use real files from `fixtures/` &mdash; no invented YAML strings in test files.
-- `fixtures/numiko/` must contain at minimum: 3 atoms, 3 molecules, 2 organisms, 1 shared/layout component.
+- `fixtures/example/` must contain at minimum: 3 atoms, 3 molecules, 2 organisms, 1 shared/layout component.
 - At least one fixture with no props, one with no slots, one with both, one intentionally malformed YAML.
 - Fixtures are committed to the repository so CI has no dependency on `pas-drupal`.
 
@@ -420,7 +420,7 @@ This section defines non-negotiable behaviour for the server. Every task in Sect
 - **Server restart recovery**: Send `shutdown` + `exit`, spawn a new server process, send a second `initialize` — assert clean re-initialization with no state from the previous session.
 - **Large workspace benchmark (CI)**: Add a vitest benchmark that generates 500 synthetic `.component.yml` fixture files in a temp directory and asserts cold indexing completes in under 2 seconds. This must run in CI to catch performance regressions.
 - **Unicode in paths**: Test that component IDs and file paths containing non-ASCII characters (e.g. accented characters in a theme name) do not cause parse failures or crashes.
-- **Windows path separators**: The provider inference algorithm in `parser.ts` uses `filePath.split(path.sep)`. On Windows `path.sep` is `\\`. Add a test that parses a Windows-style path (`C:\\project\\themes\\custom\\numiko\\components\\atoms\\button\\button.component.yml`) and asserts the provider is correctly inferred as `"numiko"`. Use `path.posix` / `path.win32` explicitly in the split to ensure cross-platform correctness.
+- **Windows path separators**: The provider inference algorithm in `parser.ts` uses `filePath.split(path.sep)`. On Windows `path.sep` is `\\`. Add a test that parses a Windows-style path (`C:\\project\\themes\\custom\\mytheme\\components\\atoms\\button\\button.component.yml`) and asserts the provider is correctly inferred as `"mytheme"`. Use `path.posix` / `path.win32` explicitly in the split to ensure cross-platform correctness.
 - **Concurrent file events**: Test that when 15 `.component.yml` files change simultaneously (simulating a `git checkout`), the global bulk-event debounce fires a single full rebuild rather than 15 individual re-parses.
 
 ### Code Quality Requirements
@@ -503,7 +503,7 @@ The server must discover all SDC components in a workspace without being told th
 - [ ] Handles `ENOENT` on a directory that disappears mid-scan: logs `debug`, skips, continues
 - [ ] Does not follow circular symlinks: tracks visited inodes, skips revisited ones
 - [ ] Does follow non-circular symlinks (Drupal projects use them)
-- [ ] Tested against `fixtures/numiko/` &mdash; returns the correct set of paths
+- [ ] Tested against `fixtures/example/` &mdash; returns the correct set of paths
 - [ ] Scanning 500 component files completes in under 500ms (benchmark with a large fixture set)
 
 ### Technical notes
@@ -533,8 +533,8 @@ Once we have a list of `.component.yml` file paths, we need to extract structure
 - [ ] The following types are exported from `packages/core/src/types.ts`:
   ```ts
   interface ComponentMetadata {
-    id: string;              // "numiko:wysiwyg"
-    provider: string;        // "numiko"
+    id: string;              // "example:wysiwyg"
+    provider: string;        // "example"
     name: string;            // human-readable from YAML
     description?: string;
     props: PropDefinition[];
@@ -562,7 +562,7 @@ Once we have a list of `.component.yml` file paths, we need to extract structure
 - [ ] Missing `props` key: parsed as `[]`, not an error
 - [ ] Missing `slots` key: parsed as `[]`, not an error
 - [ ] `twigFilePath`: derived by replacing `.component.yml` with `.twig`; if that file does not exist on disk, set to `null` (log `debug`); never throws from the existence check
-- [ ] `provider` is inferred from the directory structure: the path segment immediately before `components/` (e.g. `.../themes/custom/numiko/components/...` &rarr; provider = `"numiko"`; `.../modules/custom/foo/components/...` &rarr; provider = `"foo"`)
+- [ ] `provider` is inferred from the directory structure: the path segment immediately before `components/` (e.g. `.../themes/custom/mytheme/components/...` &rarr; provider = `"mytheme"`; `.../modules/custom/foo/components/...` &rarr; provider = `"foo"`)
 - [ ] Component `id` is `"{provider}:{componentDirectoryName}"`
 - [ ] Props are extracted from `props.properties` (YAML object) &mdash; each key becomes a `PropDefinition`
 - [ ] Required props are determined by the `props.required` array (standard JSON Schema pattern)
@@ -612,8 +612,8 @@ The scanner finds files and the parser extracts metadata. This task wires them t
 - [ ] `SDCRegistry` class exported from `packages/core`
 - [ ] `registry.build(rootDir: string): Promise<void>` &mdash; scans, parses, populates index; resolves `readyPromise`
 - [ ] `registry.readyPromise: Promise<void>` &mdash; resolves when initial build completes; used by handlers to avoid race conditions
-- [ ] `registry.getById(id: string): ComponentMetadata | undefined` &mdash; e.g. `"numiko:wysiwyg"`
-- [ ] `registry.getByNamespacePath(namespacePath: string): ComponentMetadata | undefined` &mdash; e.g. `"@numiko/atoms/wysiwyg/wysiwyg.twig"`
+- [ ] `registry.getById(id: string): ComponentMetadata | undefined` &mdash; e.g. `"example:wysiwyg"`
+- [ ] `registry.getByNamespacePath(namespacePath: string): ComponentMetadata | undefined` &mdash; e.g. `"@example/atoms/wysiwyg/wysiwyg.twig"`
 - [ ] `registry.getByProvider(provider: string): ComponentMetadata[]`
 - [ ] `registry.search(query: string): ComponentMetadata[]` &mdash; case-insensitive substring match on ID and name
 - [ ] `registry.getAllComponents(): ComponentMetadata[]`
@@ -621,11 +621,11 @@ The scanner finds files and the parser extracts metadata. This task wires them t
 - [ ] `registry.updateComponent(yamlFilePath: string): Promise<void>` &mdash; re-parses a single file, updates index entry in-place (for file watcher incremental updates)
 - [ ] `registry.removeComponent(yamlFilePath: string): void` &mdash; removes a component from the index by its yaml file path
 - [ ] All lookup methods return `undefined`/`[]` (never throw) when component is not found
-- [ ] Building from `fixtures/numiko/` completes without error; `getAllComponents()` returns the expected count
+- [ ] Building from `fixtures/example/` completes without error; `getAllComponents()` returns the expected count
 
 ### Technical notes
 - Internal stores: `Map<string, ComponentMetadata>` keyed by ID; `Map<string, ComponentMetadata>` keyed by namespace path; `Map<string, ComponentMetadata>` keyed by yaml file path (needed for `updateComponent`/`removeComponent`).
-- Namespace path format: `@{provider}/{relativePath}` where `relativePath` is the path of the `.twig` file relative to the `components/` directory. E.g.: `.../numiko/components/atoms/wysiwyg/wysiwyg.twig` &rarr; `@numiko/atoms/wysiwyg/wysiwyg.twig`.
+- Namespace path format: `@{provider}/{relativePath}` where `relativePath` is the path of the `.twig` file relative to the `components/` directory. E.g.: `.../example/components/atoms/wysiwyg/wysiwyg.twig` &rarr; `@example/atoms/wysiwyg/wysiwyg.twig`.
 - Atomic rebuild: build into a `pendingMap`, then in a single synchronous assignment: `this.indexById = pendingMap`. JavaScript&rsquo;s single-threaded model makes this atomic at the language level.
 - Log to stderr (via the logger module): number of components indexed, number of parse failures, total scan duration.
 - Export `buildRegistry(rootDir: string): Promise<SDCRegistry>` as a convenience factory.
@@ -693,7 +693,7 @@ This task creates the actual LSP server process. It wires `vscode-languageserver
 **Priority:** critical
 
 ### Context
-This is the primary user-facing feature of Phase 1. When a developer types `{% include '` in a Twig template, the server offers completion items for all known SDC component IDs (`numiko:wysiwyg`, `numiko:card`, etc.). The completion handler must correctly detect whether the cursor is inside a relevant string literal context, query the registry for all components, and return well-formed `CompletionItem` objects. It must await the initial readiness gate for index-backed results, and it must never return completions from a stale document version.
+This is the primary user-facing feature of Phase 1. When a developer types `{% include '` in a Twig template, the server offers completion items for all known SDC component IDs (`example:wysiwyg`, `example:card`, etc.). The completion handler must correctly detect whether the cursor is inside a relevant string literal context, query the registry for all components, and return well-formed `CompletionItem` objects. It must await the initial readiness gate for index-backed results, and it must never return completions from a stale document version.
 
 ### Acceptance criteria
 - [ ] Completion is triggered by `'`, `"`, `:`, `@`, and `/` characters in `.twig` files
@@ -744,7 +744,7 @@ This is the primary user-facing feature of Phase 1. When a developer types `{% i
 **Priority:** high
 
 ### Context
-When a developer presses &ldquo;go to definition&rdquo; on a component ID like `numiko:wysiwyg` in a Twig template, the editor should navigate to the component&rsquo;s `.twig` file (preferred) or fall back to its `.component.yml` file. This task implements the `textDocument/definition` handler that extracts the token under the cursor, validates it as a known component ID, and returns an LSP `Location` pointing to the correct file.
+When a developer presses &ldquo;go to definition&rdquo; on a component ID like `example:wysiwyg` in a Twig template, the editor should navigate to the component&rsquo;s `.twig` file (preferred) or fall back to its `.component.yml` file. This task implements the `textDocument/definition` handler that extracts the token under the cursor, validates it as a known component ID, and returns an LSP `Location` pointing to the correct file.
 
 ### Acceptance criteria
 - [ ] `gotoDefinition` resolves a component ID under the cursor to its `.twig` file
@@ -818,7 +818,7 @@ Phase 1 culminates with a working server that Neovim developers can use immediat
 - [ ] `docs/neovim-setup.md` created with complete, working Lua configuration
 - [ ] Covers both modern Neovim &ge;0.11 style (`vim.lsp.config` / `vim.lsp.enable`) and `nvim-lspconfig` style
 - [ ] `drupal_sdc_ls` server: correct `cmd`, `filetypes: { "twig" }`, `root_dir` pattern
-- [ ] `twiggy_language_server`: corrected config with `init_options` and `root_dir` as **top-level** client options (not under `settings`); `namespaces` config for `numiko` provider shown
+- [ ] `twiggy_language_server`: corrected config with `init_options` and `root_dir` as **top-level** client options (not under `settings`); `namespaces` config for `example` provider shown
 - [ ] `yamlls`: `yaml.schemas` mapping Drupal SDC schema URL to `["**/*.component.yml"]`; `schemaStore.enable: false` to prevent conflicts
 - [ ] Guide explains that all three servers coexist on the same `.twig` and `.component.yml` buffers; this is normal and expected
 - [ ] Guide includes `:LspInfo` and `:LspLog` as debugging hints
@@ -843,7 +843,7 @@ Phase 1 culminates with a working server that Neovim developers can use immediat
 **Priority:** high
 
 ### Context
-Phase 1 covers SDC component ID (`provider:component`) completion. Phase 2 adds completion for the long-form Twig namespace path syntax: `@numiko/atoms/wysiwyg/wysiwyg.twig`. This task extends `packages/core` with a scanner that finds all `.twig` files in the workspace and maps each to its `@namespace/relative/path.twig` string. This index is separate from the SDC component registry because it includes all Twig templates, not only SDC components.
+Phase 1 covers SDC component ID (`provider:component`) completion. Phase 2 adds completion for the long-form Twig namespace path syntax: `@example/atoms/wysiwyg/wysiwyg.twig`. This task extends `packages/core` with a scanner that finds all `.twig` files in the workspace and maps each to its `@namespace/relative/path.twig` string. This index is separate from the SDC component registry because it includes all Twig templates, not only SDC components.
 
 ### Acceptance criteria
 - [ ] `TwigFileEntry` type exported from `packages/core/src/types.ts`: `{ absolutePath: string; namespacePath: string; provider: string }`
@@ -853,7 +853,7 @@ Phase 1 covers SDC component ID (`provider:component`) completion. Phase 2 adds 
 - [ ] Files outside of a `components/` directory tree: included with a best-guess provider from the nearest named ancestor directory (log `debug`), never skipped silently
 - [ ] `SDCRegistry.build()` calls `scanForTwigFiles` alongside `scanForComponentFiles`
 - [ ] `registry.getByNamespacePath()` returns components found via either scan
-- [ ] Tested against `fixtures/numiko/` &mdash; returns all `.twig` files with correct namespace paths
+- [ ] Tested against `fixtures/example/` &mdash; returns all `.twig` files with correct namespace paths
 
 ### Technical notes
 - Reuse the same directory-walking logic from TASK-002 (extract to a shared internal `walkDir` utility).
@@ -864,7 +864,7 @@ Phase 1 covers SDC component ID (`provider:component`) completion. Phase 2 adds 
 
 ### Robustness requirements
 - Same filesystem error handling rules as TASK-002.
-- Files with duplicate namespace paths (e.g. two themes providing `@numiko/atoms/button/button.twig`): log `warn` with both paths, keep the last one indexed (predictable tiebreaker).
+- Files with duplicate namespace paths (e.g. two themes providing `@example/atoms/button/button.twig`): log `warn` with both paths, keep the last one indexed (predictable tiebreaker).
 - Must handle workspaces with multiple providers (multiple themes/modules with their own `components/` directories).
 
 ---
@@ -880,7 +880,7 @@ In addition to the `provider:component` shorthand, Drupal Twig templates regular
 ### Acceptance criteria
 - [ ] Completion triggers when cursor is inside a Twig string starting with `@` in an include/embed/extends context
 - [ ] Completions drawn from the Twig file index (all `.twig` files), not just SDC components
-- [ ] Results filtered by the prefix already typed: `@numiko/atoms/` only shows paths under that prefix
+- [ ] Results filtered by the prefix already typed: `@example/atoms/` only shows paths under that prefix
 - [ ] Results sorted: exact namespace prefix match first, then alphabetical
 - [ ] Completion item: label = namespace path, kind = `File`, detail = absolute file path (truncated if long), with lightweight initial payload and optional Markdown docs in resolve
 - [ ] Does not return raw filesystem paths &mdash; only namespace-resolved `@namespace/...` strings
@@ -906,10 +906,10 @@ In addition to the `provider:component` shorthand, Drupal Twig templates regular
 **Priority:** medium
 
 ### Context
-When a developer hovers over a component ID like `numiko:wysiwyg` in a Twig template, the editor should show a floating panel with the component&rsquo;s name, description, props table, and slots list. This removes the need to open the `.component.yml` file manually to understand what a component accepts. This task implements the `textDocument/hover` handler that extracts the token under the cursor, looks it up in the registry, and returns formatted Markdown documentation.
+When a developer hovers over a component ID like `example:wysiwyg` in a Twig template, the editor should show a floating panel with the component&rsquo;s name, description, props table, and slots list. This removes the need to open the `.component.yml` file manually to understand what a component accepts. This task implements the `textDocument/hover` handler that extracts the token under the cursor, looks it up in the registry, and returns formatted Markdown documentation.
 
 ### Acceptance criteria
-- [ ] Hovering over a valid component ID (`numiko:wysiwyg`) shows a Markdown tooltip with:
+- [ ] Hovering over a valid component ID (`example:wysiwyg`) shows a Markdown tooltip with:
   - `### {ComponentName}` heading
   - Description paragraph (if present)
   - **Props** section: Markdown table with columns: Prop, Type, Required, Description, Default
@@ -941,7 +941,7 @@ When a developer hovers over a component ID like `numiko:wysiwyg` in a Twig temp
 **Priority:** medium
 
 ### Context
-Phase 3 adds prop key completion inside `with { }` argument blocks: when typing `{% include 'numiko:card' with { `, the server offers completions for `title`, `image`, `body`, etc. To implement this, the server must detect whether the cursor is inside the `with { }` object for a known component, and identify which component is being called. This task implements that detection logic as a pure function in `packages/core`, where it can be unit-tested independently of the LSP infrastructure.
+Phase 3 adds prop key completion inside `with { }` argument blocks: when typing `{% include 'example:card' with { `, the server offers completions for `title`, `image`, `body`, etc. To implement this, the server must detect whether the cursor is inside the `with { }` object for a known component, and identify which component is being called. This task implements that detection logic as a pure function in `packages/core`, where it can be unit-tested independently of the LSP infrastructure.
 
 ### Acceptance criteria
 - [ ] `InvocationContext` type exported from `packages/core/src/types.ts`:
@@ -952,7 +952,7 @@ Phase 3 adds prop key completion inside `with { }` argument blocks: when typing 
   }
   ```
 - [ ] `detectInvocationContext(documentText: string, cursorOffset: number): InvocationContext | null` exported from `packages/core`
-- [ ] Returns `InvocationContext` when: cursor is inside `{% include 'numiko:card' with { ... } %}` after the `{`
+- [ ] Returns `InvocationContext` when: cursor is inside `{% include 'example:card' with { ... } %}` after the `{`
 - [ ] `alreadyUsedKeys`: keys already present in the `{ }` block before the cursor
 - [ ] Returns `null` for: cursor not inside a `with {}` block; ambiguous/unparseable context; empty document
 - [ ] Never throws under any input
@@ -1010,7 +1010,7 @@ Currently the server provides completions but does not warn developers when they
 
 ### Acceptance criteria
 - [ ] Warning diagnostic on the string range of an unknown `provider:component` ID
-- [ ] Diagnostic message: `Unknown SDC component: "numiko:unknown". Check the component is registered and the provider name is correct.`
+- [ ] Diagnostic message: `Unknown SDC component: "example:unknown". Check the component is registered and the provider name is correct.`
 - [ ] Diagnostics refreshed when a document is opened (`onDidOpen`) or saved (`onDidSave`)
 - [ ] No diagnostic on valid, registered component IDs
 - [ ] Diagnostics cleared when the invalid ID is corrected
@@ -1195,31 +1195,31 @@ For `drupal-sdc-lsp` to be installable by any developer via `npm install -g drup
 **Priority:** critical
 
 ### Context
-All tests and manual verification depend on realistic, representative component data. Rather than inventing fake `.component.yml` files in test files, this task copies a curated subset of real components from the `pas-drupal` project (`/Users/nmkadmin/Developer/pas-drupal/docroot/themes/custom/numiko/components/`) into `fixtures/numiko/`. These fixtures are the authoritative source of truth for all unit and integration tests and are committed to the repository so CI has no dependency on the private `pas-drupal` codebase.
+All tests and manual verification depend on realistic, representative component data. Rather than inventing fake `.component.yml` files in test files, this task copies a curated subset of real components from the `pas-drupal` project (`/Users/nmkadmin/Developer/pas-drupal/docroot/themes/custom/mytheme/components/`) into `fixtures/example/`. These fixtures are the authoritative source of truth for all unit and integration tests and are committed to the repository so CI has no dependency on the private `pas-drupal` codebase.
 
 ### Acceptance criteria
-- [ ] `fixtures/numiko/atoms/` &mdash; at least 3 atom components (e.g. `button`, `tag`, `icon`)
-- [ ] `fixtures/numiko/molecules/` &mdash; at least 3 molecule components (e.g. `card`, `media`, `teaser`)
-- [ ] `fixtures/numiko/organisms/` &mdash; at least 2 organism components (e.g. `hero`, `listing`)
-- [ ] `fixtures/numiko/shared/` &mdash; at least 1 shared/layout component
+- [ ] `fixtures/example/atoms/` &mdash; at least 3 atom components (e.g. `button`, `tag`, `icon`)
+- [ ] `fixtures/example/molecules/` &mdash; at least 3 molecule components (e.g. `card`, `media`, `teaser`)
+- [ ] `fixtures/example/organisms/` &mdash; at least 2 organism components (e.g. `hero`, `listing`)
+- [ ] `fixtures/example/shared/` &mdash; at least 1 shared/layout component
 - [ ] At least one component with props and no slots
 - [ ] At least one component with slots and no props
 - [ ] At least one component with both props and slots
 - [ ] At least one component with no props and no slots
-- [ ] `fixtures/numiko/malformed/malformed.component.yml` &mdash; a deliberately malformed YAML file (for negative testing)
-- [ ] `fixtures/numiko/malformed/no-name.component.yml` &mdash; a valid YAML file missing the `name` field
+- [ ] `fixtures/example/malformed/malformed.component.yml` &mdash; a deliberately malformed YAML file (for negative testing)
+- [ ] `fixtures/example/malformed/no-name.component.yml` &mdash; a valid YAML file missing the `name` field
 - [ ] Each component directory contains both `.component.yml` and `.twig` files (paired)
 - [ ] `fixtures/README.md` documents: source project, purpose, how to update fixtures
 
 ### Technical notes
-- Source: `cp -r /Users/nmkadmin/Developer/pas-drupal/docroot/themes/custom/numiko/components/{atoms,molecules,organisms} fixtures/numiko/`
+- Source: `cp -r /Users/nmkadmin/Developer/pas-drupal/docroot/themes/custom/mytheme/components/{atoms,molecules,organisms} fixtures/example/`
 - Review copied files for sensitive content (customer data, internal URLs) before committing. Replace any sensitive values with generic placeholder text.
 - The malformed YAML fixture should be: valid file extension, invalid YAML syntax (e.g. unmatched indentation or a tab character in a YAML value).
 - Fixture `.twig` files can be simplified (template body does not need to be complete Twig &mdash; just enough to verify the file exists and has correct content).
 
 ### Robustness requirements
 - Fixtures must stay in sync with the parser&rsquo;s expected YAML structure. If the Drupal SDC schema changes in a future Drupal version, fixtures should be updated to match.
-- The `malformed/` directory must never contain files that accidentally parse correctly. Add a test assertion that `parseComponentYaml("fixtures/numiko/malformed/malformed.component.yml")` returns `null`.
+- The `malformed/` directory must never contain files that accidentally parse correctly. Add a test assertion that `parseComponentYaml("fixtures/example/malformed/malformed.component.yml")` returns `null`.
 
 ---
 ## TASK-021: Unit tests for `packages/core`
@@ -1235,7 +1235,7 @@ All tests and manual verification depend on realistic, representative component 
 - [ ] Tests written using Vitest (`describe`/`it`/`expect`)
 - [ ] Test files in `packages/core/src/__tests__/`: `scanner.test.ts`, `parser.test.ts`, `registry.test.ts`, `context-detector.test.ts`
 - [ ] **Scanner tests:**
-  - Given `fixtures/numiko/`, returns all `.component.yml` paths
+  - Given `fixtures/example/`, returns all `.component.yml` paths
   - Non-existent root dir: returns `[]`
   - Directory with no `.component.yml` files: returns `[]`
   - Simulated `EACCES` (mock `fs.promises.readdir` to throw): function returns `[]`, does not throw
@@ -1250,10 +1250,10 @@ All tests and manual verification depend on realistic, representative component 
   - Empty file: returns `null`
   - Twig file not on disk: `twigFilePath` is `null`, does not throw
 - [ ] **Registry tests:**
-  - `build()` from `fixtures/numiko/`: no errors, `getAllComponents()` returns expected count
-  - `getById("numiko:button")`: returns correct metadata
-  - `getById("numiko:nonexistent")`: returns `undefined`
-  - `getByProvider("numiko")`: returns all numiko components
+  - `build()` from `fixtures/example/`: no errors, `getAllComponents()` returns expected count
+  - `getById("example:button")`: returns correct metadata
+  - `getById("example:nonexistent")`: returns `undefined`
+  - `getByProvider("example")`: returns all example components
   - `search("card")`: returns components whose ID or name contains &ldquo;card&rdquo;
   - `updateComponent()` with a changed fixture: reflected in next `getById()` call
   - `removeComponent()`: component no longer returned by `getById()`
@@ -1268,7 +1268,7 @@ All tests and manual verification depend on realistic, representative component 
 - [ ] Test coverage for `packages/core` is above 80%
 
 ### Technical notes
-- Fixture path resolution: `import { resolve } from "path"; const FIXTURES = resolve(__dirname, "../../../../fixtures/numiko");`
+- Fixture path resolution: `import { resolve } from "path"; const FIXTURES = resolve(__dirname, "../../../../fixtures/example");`
 - For `EACCES` simulation: use `vi.spyOn(fs.promises, "readdir").mockRejectedValueOnce(Object.assign(new Error("EACCES"), { code: "EACCES" }))`. Restore after the test.
 - Do not mock the filesystem for positive tests &mdash; test against real fixture files. Real-file tests are faster than mocking and catch path-handling bugs.
 - Use `vitest`&rsquo;s `test.each` for the parser edge cases to avoid repetitive test boilerplate.
@@ -1293,9 +1293,9 @@ Unit tests verify the indexing logic in isolation. Integration tests verify that
 - [ ] Test harness: spawns `node packages/language-server/dist/server.js --stdio` as a child process; wraps stdin/stdout with `createMessageConnection` from `vscode-jsonrpc/node`
 - [ ] **Test: initialize handshake** &mdash; `initialize` request with `rootUri` or `workspaceFolders` pointing at `fixtures/` returns `InitializeResult` with `completionProvider`, `definitionProvider`, `hoverProvider` in capabilities, followed by an `initialized` notification
 - [ ] **Test: completion &mdash; SDC IDs** &mdash; open a virtual `test.twig` document with content `{% include '`; send `textDocument/completion` with cursor after the `'`; assert response contains completion items for all fixture components (by ID)
-- [ ] **Test: completion &mdash; partial match** &mdash; content `{% include 'numiko:b`; assert completions are filtered to only IDs starting with `numiko:b`
-- [ ] **Test: go-to-definition &mdash; hit** &mdash; document containing `numiko:button`; `textDocument/definition` at the token; assert response `uri` ends with `button.twig`
-- [ ] **Test: go-to-definition &mdash; miss** &mdash; token `numiko:nonexistent`; assert response is `null`
+- [ ] **Test: completion &mdash; partial match** &mdash; content `{% include 'example:b`; assert completions are filtered to only IDs starting with `example:b`
+- [ ] **Test: go-to-definition &mdash; hit** &mdash; document containing `example:button`; `textDocument/definition` at the token; assert response `uri` ends with `button.twig`
+- [ ] **Test: go-to-definition &mdash; miss** &mdash; token `example:nonexistent`; assert response is `null`
 - [ ] **Test: file watcher** &mdash; copy a new `.component.yml` into a temp directory that is the workspace root; assert the new component ID appears in completions within 1500ms
 - [ ] **Test: diagnostics notification** &mdash; open/save a document with an unknown component ID; listen for `textDocument/publishDiagnostics` and assert the warning arrives as a notification, not a response payload
 - [ ] **Test: malformed request** &mdash; send a `textDocument/completion` request with missing `textDocument` param; assert server responds with an LSP error response and does not exit
@@ -1378,10 +1378,10 @@ vim.lsp.config("twiggy_language_server", {
     -- Twig namespace configuration. Adjust paths to match your Drupal project.
     namespaces = {
       {
-        namespace = "numiko",
+        namespace = "example",
         paths = {
-          "docroot/themes/custom/numiko/templates",
-          "docroot/themes/custom/numiko/components",
+          "docroot/themes/custom/mytheme/templates",
+          "docroot/themes/custom/mytheme/components",
         },
       },
     },
@@ -1465,10 +1465,10 @@ lspconfig.twiggy_language_server.setup({
   init_options = {
     namespaces = {
       {
-        namespace = "numiko",
+        namespace = "example",
         paths = {
-          "docroot/themes/custom/numiko/templates",
-          "docroot/themes/custom/numiko/components",
+          "docroot/themes/custom/mytheme/templates",
+          "docroot/themes/custom/mytheme/components",
         },
       },
     },
@@ -1526,7 +1526,7 @@ Phase 1&ndash;3 focus on theme-provided components. Drupal contributed modules (
 Many SDC component sets are documented in Storybook. A future feature could read Storybook story files (`.stories.ts`) to enrich hover documentation with usage examples. This would require detecting Storybook in the workspace and parsing story exports &mdash; non-trivial but high-value for design-system teams.
 
 **`component()` Twig function (contrib module)**  
-The `{{ component('numiko:card', { title: '...' }) }}` syntax is provided by a contributed Drupal module, not Drupal core. Supporting it properly requires detecting whether the module is present and handling the slightly different argument structure. Currently deferred as it affects a smaller subset of projects.
+The `{{ component('example:card', { title: '...' }) }}` syntax is provided by a contributed Drupal module, not Drupal core. Supporting it properly requires detecting whether the module is present and handling the slightly different argument structure. Currently deferred as it affects a smaller subset of projects.
 
 **Rename refactoring for component IDs**  
 An LSP `textDocument/rename` handler could rename a component ID across all Twig files in the workspace when the component directory is renamed. This requires: finding all usages of the old ID, computing text edits for each, and returning a `WorkspaceEdit`. High-value but complex to implement safely.

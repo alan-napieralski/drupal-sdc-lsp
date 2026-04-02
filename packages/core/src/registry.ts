@@ -136,7 +136,7 @@ export class SDCRegistry {
   }
 
   /**
-   * Looks up a component by its machine ID (e.g. `"numiko:wysiwyg"`).
+   * Looks up a component by its machine ID (e.g. `"example:wysiwyg"`).
    *
    * @param id - Component ID in `"provider:name"` format
    * @returns The matching component metadata, or `undefined` if not found
@@ -146,7 +146,7 @@ export class SDCRegistry {
   }
 
   /**
-   * Looks up a component by its Twig namespace path (e.g. `"@numiko/atoms/wysiwyg/wysiwyg.twig"`).
+   * Looks up a component by its Twig namespace path (e.g. `"@example/atoms/wysiwyg/wysiwyg.twig"`).
    *
    * @param namespacePath - Namespace path starting with `@provider/`
    * @returns The matching component metadata, or `undefined` if not found
@@ -158,7 +158,7 @@ export class SDCRegistry {
   /**
    * Returns all components from a specific provider.
    *
-   * @param provider - Provider name (e.g. `"numiko"`)
+   * @param provider - Provider name (e.g. `"example"`)
    * @returns All indexed components from that provider
    */
   getByProvider(provider: string): ComponentMetadata[] {
