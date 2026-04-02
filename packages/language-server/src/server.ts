@@ -68,7 +68,7 @@ connection.onInitialize((params) => {
       positionEncoding: PositionEncodingKind.UTF16,
       textDocumentSync: TextDocumentSyncKind.Incremental,
       completionProvider: {
-        triggerCharacters: ["'", '"', ':', '@', '/'],
+        triggerCharacters: ["'", '"', ':', '@', '/', '%'],
         resolveProvider: true,
       },
       definitionProvider: true,
