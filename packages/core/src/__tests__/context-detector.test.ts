@@ -54,6 +54,41 @@ describe('detectInvocationContext', () => {
     });
   });
 
+  describe('multi-line with {} blocks', () => {
+    it('detects context when cursor is on a new line inside with {}', () => {
+      const text = "{% include 'example:card' with {\n    ";
+      const result = detectInvocationContext(text, text.length);
+
+      expect(result).not.toBeNull();
+      expect(result!.componentId).toBe('example:card');
+      expect(result!.alreadyUsedKeys).toEqual([]);
+    });
+
+    it('extracts already-used keys from previous lines in with {}', () => {
+      const text = "{% include 'example:card' with {\n    title: 'foo',\n    ";
+      const result = detectInvocationContext(text, text.length);
+
+      expect(result).not.toBeNull();
+      expect(result!.alreadyUsedKeys).toContain('title');
+    });
+
+    it('extracts multiple used keys across lines', () => {
+      const text = "{% include 'example:card' with {\n    title: 'foo',\n    url: '/bar',\n    ";
+      const result = detectInvocationContext(text, text.length);
+
+      expect(result).not.toBeNull();
+      expect(result!.alreadyUsedKeys).toContain('title');
+      expect(result!.alreadyUsedKeys).toContain('url');
+    });
+
+    it('returns null when multi-line with block is closed', () => {
+      const text = "{% include 'example:card' with {\n    title: 'foo'\n} %}";
+      const result = detectInvocationContext(text, text.length);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('null cases', () => {
     it('returns null when cursor is before the with keyword', () => {
       const text = "{% include 'example:card'";

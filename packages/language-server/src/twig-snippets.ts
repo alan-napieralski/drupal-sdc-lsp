@@ -60,7 +60,7 @@ const SNIPPET_DEFS: SnippetDef[] = [
   {
     label: 'include with',
     keywords: ['include'],
-    fullSnippet: "{% include '${1:provider:component}' with { ${2} } %}",
+    fullSnippet: "{% include '${1:provider:component}' with {\n\t${2}\n} %}",
     detail: 'Include with variables',
     sortText: '0_include_with',
     generic: false,
@@ -76,7 +76,7 @@ const SNIPPET_DEFS: SnippetDef[] = [
   {
     label: 'embed with',
     keywords: ['embed'],
-    fullSnippet: "{% embed '${1:provider:component}' with { ${2} } %}\n\t${3}\n{% endembed %}",
+    fullSnippet: "{% embed '${1:provider:component}' with {\n\t${2}\n} %}\n\t${3}\n{% endembed %}",
     detail: 'Embed with variables',
     sortText: '0_embed_with',
     generic: false,
@@ -335,7 +335,12 @@ export function getTwigTagSnippets(
   // Consume a trailing auto-closed `}` so we don't end up with `%}}`
   const hasAutoCloseBrace =
     lineAfterCursor.startsWith('}') && !lineAfterCursor.startsWith('%}');
-  const rangeEndChar = cursorChar + (hasAutoCloseBrace ? 1 : 0);
+  // Also consume a trailing `%}` (with optional leading space or `-`) that the
+  // editor auto-inserted when the user opened the `{%` tag, so we don't end up
+  // with `{% include '...' %} %}`.
+  const tagCloseMatch = /^[ \t]*-?%\}/.exec(lineAfterCursor);
+  const rangeEndChar =
+    cursorChar + (hasAutoCloseBrace ? 1 : tagCloseMatch !== null ? tagCloseMatch[0].length : 0);
 
   const replaceRange = Range.create(
     Position.create(lineNumber, openerStart),

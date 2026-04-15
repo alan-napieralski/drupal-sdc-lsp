@@ -1,4 +1,4 @@
-export { scanForComponentFiles } from './scanner.js';
+export { scanForComponentFiles, scanForTwigTemplateFiles } from './scanner.js';
 export { parseComponentYaml } from './parser.js';
 export { SDCRegistry, buildRegistry } from './registry.js';
 export { detectInvocationContext } from './context-detector.js';

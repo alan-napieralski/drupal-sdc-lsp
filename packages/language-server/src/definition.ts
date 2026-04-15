@@ -5,12 +5,7 @@ import type { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 import type { SDCRegistry } from '@drupal-sdc-lsp/core';
 import type { Logger } from './logger.js';
-
-/**
- * Pattern that matches a `provider:component` style ID token.
- * Allows letters, digits, underscores, and hyphens on both sides of the colon.
- */
-const COMPONENT_ID_PATTERN = /[a-z0-9_][a-z0-9_-]*:[a-z0-9_][a-z0-9_-]*/g;
+import { extractComponentIdTokenAtOffset } from './token-extractor.js';
 
 /** A zero-width range at the top of a file — sufficient for go-to-definition. */
 const TOP_OF_FILE_RANGE = Range.create(0, 0, 0, 0);
@@ -43,10 +38,11 @@ export async function getDefinition(
 
   const lineText = doc.getText().split('\n')[params.position.line] ?? '';
 
-  const componentId = extractComponentIdAtOffset(lineText, params.position.character);
-  if (componentId === null) {
+  const token = extractComponentIdTokenAtOffset(lineText, params.position.character);
+  if (token === null) {
     return null;
   }
+  const componentId = token.id;
 
   await registry.readyPromise;
 
@@ -69,29 +65,6 @@ export async function getDefinition(
     uri: URI.file(targetPath).toString(),
     range: TOP_OF_FILE_RANGE,
   };
-}
-
-/**
- * Extracts a `provider:component` token from a line of text at a given character offset.
- *
- * @param lineText - Full text of the line
- * @param characterOffset - Zero-based cursor position within the line
- * @returns The matched component ID, or `null` if no token spans the cursor
- */
-function extractComponentIdAtOffset(lineText: string, characterOffset: number): string | null {
-  COMPONENT_ID_PATTERN.lastIndex = 0;
-
-  let match: RegExpExecArray | null;
-  while ((match = COMPONENT_ID_PATTERN.exec(lineText)) !== null) {
-    const tokenStart = match.index;
-    const tokenEnd = tokenStart + match[0].length;
-
-    if (characterOffset >= tokenStart && characterOffset <= tokenEnd) {
-      return match[0];
-    }
-  }
-
-  return null;
 }
 
 /**

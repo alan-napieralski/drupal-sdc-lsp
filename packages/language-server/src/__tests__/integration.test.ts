@@ -152,6 +152,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Normalises an LSP completion result to a plain array regardless of whether
+ *  the server returned CompletionItem[] or a CompletionList. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- LSP result shape varies
+function toItemArray(result: any): Array<{ label: string }> {
+  if (Array.isArray(result)) return result as Array<{ label: string }>;
+  if (result !== null && typeof result === 'object' && Array.isArray(result.items)) {
+    return result.items as Array<{ label: string }>;
+  }
+  return [];
+}
+
 const WORKSPACE_URI = URI.file(FIXTURES_DIR).toString();
 
 const INIT_PARAMS = {
@@ -309,6 +320,306 @@ describe('LSP integration tests', () => {
 
       expect(definitionResponse.error).toBeUndefined();
       expect(definitionResponse.result).toBeNull();
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns prop completions inside with {} block', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-props.twig').toString();
+      const docText = "{% include 'example:card' with { ";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = completionResponse.result as Array<{ label: string }>;
+      expect(Array.isArray(items)).toBe(true);
+      expect(items.length).toBeGreaterThan(0);
+
+      const labels = items.map((item) => item.label);
+      // example:card has props: title, url, image_src, image_alt and slots: body, footer
+      expect(labels).toContain('title');
+      expect(labels).toContain('url');
+      expect(labels).toContain('image_src');
+      expect(labels).toContain('body');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('excludes already-used keys from prop completions', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-props-used.twig').toString();
+      const docText = "{% include 'example:card' with { title: 'foo', ";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = completionResponse.result as Array<{ label: string }>;
+      expect(Array.isArray(items)).toBe(true);
+
+      const labels = items.map((item) => item.label);
+      expect(labels).not.toContain('title');
+      expect(labels).toContain('url');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns component completions when include keyword is on a previous line', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-multiline-include.twig').toString();
+      // include keyword on line 0, string literal on line 1
+      const docText = "{% include\n  '";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 1, character: 3 },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = completionResponse.result as Array<{ label: string }>;
+      expect(Array.isArray(items)).toBe(true);
+      expect(items.length).toBeGreaterThan(0);
+
+      const labels = items.map((item) => item.label);
+      expect(labels).toContain('example:button');
+      expect(labels).toContain('example:card');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns namespace path completions for @provider/ includes', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-namespace.twig').toString();
+      const docText = "{% include '@";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = completionResponse.result as Array<{ label: string }>;
+      expect(Array.isArray(items)).toBe(true);
+      expect(items.length).toBeGreaterThan(0);
+
+      const labels = items.map((item) => item.label);
+      // All namespace paths should start with @example/
+      expect(labels.every((l) => l.startsWith('@example/'))).toBe(true);
+      // Should include at least the button and card components
+      expect(labels.some((l) => l.includes('button.twig'))).toBe(true);
+      expect(labels.some((l) => l.includes('card.twig'))).toBe(true);
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns with { } completion after component string', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-tag-body.twig').toString();
+      // Cursor immediately after the closing quote — no `with` typed yet
+      const docText = "{% include 'example:card' ";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = toItemArray(completionResponse.result);
+      expect(items.length).toBeGreaterThan(0);
+
+      const labels = items.map((item) => item.label);
+      expect(labels).toContain('with { }');
+      // Should NOT offer generic `with / endwith` here
+      expect(labels).not.toContain('with / endwith');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns with { } completion when partial "wi" typed after component string', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-tag-body-partial.twig').toString();
+      const docText = "{% include 'example:card' wi";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = toItemArray(completionResponse.result);
+      expect(items.length).toBeGreaterThan(0);
+
+      const labels = items.map((item) => item.label);
+      expect(labels).toContain('with { }');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('includes non-SDC template files in namespace completions', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-namespace-templates.twig').toString();
+      const docText = "{% include '@example/";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = completionResponse.result as Array<{ label: string }>;
+      expect(Array.isArray(items)).toBe(true);
+      expect(items.length).toBeGreaterThan(0);
+
+      const labels = items.map((item) => item.label);
+      // Template files from fixtures/example/templates/ should appear
+      expect(labels).toContain('@example/layout/page.twig');
+      expect(labels).toContain('@example/_includes/section.html.twig');
 
       await client.request('shutdown', undefined);
       client.notify('exit', undefined);

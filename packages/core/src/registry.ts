@@ -1,7 +1,7 @@
 import * as path from 'path';
-import { scanForComponentFiles } from './scanner.js';
+import { scanForComponentFiles, scanForTwigTemplateFiles } from './scanner.js';
 import { parseComponentYaml } from './parser.js';
-import type { ComponentMetadata } from './types.js';
+import type { ComponentMetadata, TwigFileEntry } from './types.js';
 
 /**
  * In-memory index of all Drupal SDC components discovered in a workspace.
@@ -13,6 +13,7 @@ export class SDCRegistry {
   private indexById: Map<string, ComponentMetadata> = new Map();
   private indexByNamespacePath: Map<string, ComponentMetadata> = new Map();
   private indexByYamlPath: Map<string, ComponentMetadata> = new Map();
+  private indexByStandaloneTwig: Map<string, TwigFileEntry> = new Map();
 
   /** Resolves when the initial index build completes. */
   readonly readyPromise: Promise<void>;
@@ -32,7 +33,10 @@ export class SDCRegistry {
    */
   async build(rootDir: string): Promise<void> {
     const startTime = Date.now();
-    const yamlPaths = await scanForComponentFiles(rootDir);
+    const [yamlPaths, twigEntries] = await Promise.all([
+      scanForComponentFiles(rootDir),
+      scanForTwigTemplateFiles(rootDir),
+    ]);
 
     let parseFailures = 0;
     for (const yamlPath of yamlPaths) {
@@ -44,9 +48,14 @@ export class SDCRegistry {
       this.indexComponent(metadata);
     }
 
+    for (const entry of twigEntries) {
+      this.indexByStandaloneTwig.set(entry.namespacePath, entry);
+    }
+
     const duration = Date.now() - startTime;
     process.stderr.write(
       `[info] Registry built: ${this.indexById.size} components indexed, ` +
+      `${this.indexByStandaloneTwig.size} template files, ` +
       `${parseFailures} parse failures, ${duration}ms\n`,
     );
 
@@ -64,8 +73,12 @@ export class SDCRegistry {
     const tempById: Map<string, ComponentMetadata> = new Map();
     const tempByNamespacePath: Map<string, ComponentMetadata> = new Map();
     const tempByYamlPath: Map<string, ComponentMetadata> = new Map();
+    const tempByStandaloneTwig: Map<string, TwigFileEntry> = new Map();
 
-    const yamlPaths = await scanForComponentFiles(rootDir);
+    const [yamlPaths, twigEntries] = await Promise.all([
+      scanForComponentFiles(rootDir),
+      scanForTwigTemplateFiles(rootDir),
+    ]);
     let parseFailures = 0;
 
     for (const yamlPath of yamlPaths) {
@@ -86,14 +99,20 @@ export class SDCRegistry {
       }
     }
 
+    for (const entry of twigEntries) {
+      tempByStandaloneTwig.set(entry.namespacePath, entry);
+    }
+
     // Atomic swap — single-threaded JS makes this safe
     this.indexById = tempById;
     this.indexByNamespacePath = tempByNamespacePath;
     this.indexByYamlPath = tempByYamlPath;
+    this.indexByStandaloneTwig = tempByStandaloneTwig;
 
     const duration = Date.now() - startTime;
     process.stderr.write(
       `[info] Registry rebuilt: ${this.indexById.size} components, ` +
+      `${this.indexByStandaloneTwig.size} template files, ` +
       `${parseFailures} parse failures, ${duration}ms\n`,
     );
   }
@@ -189,6 +208,14 @@ export class SDCRegistry {
    */
   getAllComponents(): ComponentMetadata[] {
     return Array.from(this.indexById.values());
+  }
+
+  /**
+   * Returns all indexed non-SDC twig template file entries.
+   * Used to power `@namespace/path.twig` completions for regular templates.
+   */
+  getAllTwigEntries(): TwigFileEntry[] {
+    return Array.from(this.indexByStandaloneTwig.values());
   }
 
   /** Internal helper to add or update a component in all three indexes. */

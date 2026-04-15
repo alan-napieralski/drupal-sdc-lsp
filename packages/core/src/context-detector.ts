@@ -40,13 +40,10 @@ export function detectInvocationContext(
   const lookbackStart = Math.max(0, safeOffset - LOOKBACK_LIMIT);
   const textBeforeCursor = documentText.slice(lookbackStart, safeOffset);
 
-  // Find the start of the current line to anchor the regex search
-  const lastNewline = textBeforeCursor.lastIndexOf('\n');
-  const lineText = lastNewline === -1
-    ? textBeforeCursor
-    : textBeforeCursor.slice(lastNewline + 1);
-
-  const match = INVOCATION_PATTERN.exec(lineText);
+  // Apply the pattern against the full lookback window so that multi-line
+  // `with {}` blocks are detected even when the cursor is on a different line
+  // than the include/embed statement.
+  const match = INVOCATION_PATTERN.exec(textBeforeCursor);
   if (match === null) {
     return null;
   }
