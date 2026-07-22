@@ -106,4 +106,34 @@ describe('getDiagnostics', () => {
   it('returns no diagnostics for an empty document', () => {
     expect(getDiagnostics(makeDoc(''), registry)).toEqual([]);
   });
+
+  it('ignores unknown components inside a Twig comment', () => {
+    const doc = makeDoc("{# {% include 'example:missing' %} #}");
+    expect(getDiagnostics(doc, registry)).toEqual([]);
+  });
+
+  it('ignores unknown components inside a multi-line Twig comment', () => {
+    const doc = makeDoc(
+      "{#\n  Example usage:\n  {% include 'example:missing' %}\n#}",
+    );
+    expect(getDiagnostics(doc, registry)).toEqual([]);
+  });
+
+  it('ignores unknown components inside a verbatim block', () => {
+    const doc = makeDoc(
+      "{% verbatim %}{% include 'example:missing' %}{% endverbatim %}",
+    );
+    expect(getDiagnostics(doc, registry)).toEqual([]);
+  });
+
+  it('still reports unknown components outside a comment on the same document', () => {
+    const doc = makeDoc(
+      "{# {% include 'example:commented' %} #}\n" +
+      "{% include 'example:live' %}",
+    );
+    const diags = getDiagnostics(doc, registry);
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toBe('Unknown SDC component: "example:live"');
+    expect(diags[0].range.start.line).toBe(1);
+  });
 });
