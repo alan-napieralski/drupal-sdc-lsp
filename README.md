@@ -12,7 +12,7 @@ Provides editor-agnostic intelligence — works in Neovim, VS Code, and any LSP-
 Type `{% include '` or `{% embed '` and get autocomplete for all SDC component IDs in your workspace (`mytheme:card`, `mytheme:button`, etc.). The server recursively scans every `components/` directory, infers the provider from the path, and builds a live index.
 
 ### Go-to-Definition
-Press your editor's go-to-definition key on any component ID (e.g. `mytheme:card`) and jump directly to the component's `.twig` file.
+Press your editor's go-to-definition key on any component ID (e.g. `mytheme:card`) or namespace path (e.g. `@mytheme/atoms/button/button.twig`) and jump directly to the component's `.twig` file.
 
 ### Hover Documentation
 Hover over any component ID to see its name, description, props table (with types and required fields), and slots list — rendered from the component's `.component.yml`.
@@ -309,6 +309,7 @@ Log messages to expect on healthy startup:
 
 ## Roadmap
 
-- **Phase 2** — Prop/slot key completions inside `with { }` blocks; `@namespace/path.twig` completions
-- **Phase 3** — Diagnostics for unknown component IDs
-- **Phase 4** — VS Code extension wrapper
+- ✅ **Phase 1** — Foundation: SDC indexing, component ID completion, go-to-definition
+- ✅ **Phase 2** — `@namespace/path.twig` completions and hover documentation
+- ✅ **Phase 3** — Prop/slot key completions inside `with { }` blocks; diagnostics for unknown component IDs
+- ⬜ **Phase 4** — VS Code extension wrapper

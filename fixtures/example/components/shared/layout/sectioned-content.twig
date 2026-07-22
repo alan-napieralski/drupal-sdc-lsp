@@ -1,0 +1,10 @@
+{#
+  Shared layout template (not an SDC — no .component.yml sibling).
+  Referenced via the theme-root namespace, e.g.
+  {% extends '@example/components/shared/layout/sectioned-content.twig' %}
+#}
+<div class="sectioned-content">
+  {% block header %}{% endblock %}
+  {% block sections %}{% endblock %}
+  {% block footer %}{% endblock %}
+</div>

@@ -218,6 +218,16 @@ export class SDCRegistry {
     return Array.from(this.indexByStandaloneTwig.values());
   }
 
+  /**
+   * Looks up a non-SDC twig template entry by its namespace path.
+   *
+   * @param namespacePath - Namespace path starting with `@provider/`
+   * @returns The matching twig file entry, or `undefined` if not found
+   */
+  getTwigEntryByNamespacePath(namespacePath: string): TwigFileEntry | undefined {
+    return this.indexByStandaloneTwig.get(namespacePath);
+  }
+
   /** Internal helper to add or update a component in all three indexes. */
   private indexComponent(metadata: ComponentMetadata): void {
     this.indexById.set(metadata.id, metadata);

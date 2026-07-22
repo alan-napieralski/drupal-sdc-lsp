@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { scanForComponentFiles } from '../scanner.js';
+import { scanForComponentFiles, scanForTwigTemplateFiles } from '../scanner.js';
 
 const FIXTURES_DIR = path.resolve(__dirname, '../../../../fixtures/example');
 
@@ -132,5 +132,36 @@ describe('scanForComponentFiles', () => {
     } finally {
       await fs.promises.rm(tempDir, { recursive: true });
     }
+  });
+});
+
+describe('scanForTwigTemplateFiles', () => {
+  it('indexes non-SDC templates under templates/ with the segment dropped', async () => {
+    const entries = await scanForTwigTemplateFiles(FIXTURES_DIR);
+    const paths = entries.map((e) => e.namespacePath);
+
+    expect(paths).toContain('@example/layout/page.twig');
+    expect(paths).toContain('@example/_includes/section.html.twig');
+  });
+
+  it('indexes non-SDC templates under components/ keeping the components segment', async () => {
+    const entries = await scanForTwigTemplateFiles(FIXTURES_DIR);
+    const match = entries.find(
+      (e) => e.namespacePath === '@example/components/shared/layout/sectioned-content.twig',
+    );
+
+    expect(match).toBeDefined();
+    expect(path.isAbsolute(match!.absolutePath)).toBe(true);
+    expect(match!.absolutePath.endsWith('components/shared/layout/sectioned-content.twig')).toBe(true);
+  });
+
+  it('excludes SDC component twig files (they have a .component.yml sibling)', async () => {
+    const entries = await scanForTwigTemplateFiles(FIXTURES_DIR);
+    const paths = entries.map((e) => e.namespacePath);
+
+    // card, button, icon, etc. are SDC — served by the component index, not here
+    expect(paths.some((p) => p.endsWith('card.twig'))).toBe(false);
+    expect(paths.some((p) => p.endsWith('button.twig'))).toBe(false);
+    expect(paths.some((p) => p.endsWith('icon.twig'))).toBe(false);
   });
 });

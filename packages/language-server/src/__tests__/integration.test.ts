@@ -31,12 +31,14 @@ function encodeMessage(message: JsonRpcMessage): Buffer {
 
 /**
  * Minimal LSP client that communicates via stdin/stdout JSON-RPC framing.
- * Matches responses to requests by ID — notifications are discarded.
+ * Matches responses to requests by ID. Notifications (no id) are stored and
+ * can be awaited via waitForNotification().
  */
 class LspClient {
   private readonly proc: child_process.ChildProcess;
   private buffer = Buffer.alloc(0);
   private pendingRequests = new Map<number | string, (msg: JsonRpcMessage) => void>();
+  private pendingNotifications = new Map<string, Array<(msg: JsonRpcMessage) => void>>();
   private nextId = 1;
 
   constructor(proc: child_process.ChildProcess) {
@@ -72,14 +74,47 @@ class LspClient {
       }
 
       if (msg.id !== undefined && msg.id !== null) {
+        // Response to a request
         const resolver = this.pendingRequests.get(msg.id);
         if (resolver !== undefined) {
           this.pendingRequests.delete(msg.id);
           resolver(msg);
         }
+      } else if (msg.method !== undefined) {
+        // Notification — dispatch to any waiting listeners
+        const listeners = this.pendingNotifications.get(msg.method);
+        if (listeners !== undefined && listeners.length > 0) {
+          const listener = listeners.shift()!;
+          listener(msg);
+        }
       }
-      // Notifications have no id — ignored in these tests
     }
+  }
+
+  /**
+   * Returns a promise that resolves with the next notification matching the given method.
+   */
+  waitForNotification(method: string, timeoutMs = 5000): Promise<JsonRpcMessage> {
+    return new Promise<JsonRpcMessage>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const listeners = this.pendingNotifications.get(method);
+        if (listeners !== undefined) {
+          const idx = listeners.indexOf(resolver);
+          if (idx !== -1) listeners.splice(idx, 1);
+        }
+        reject(new Error(`Timeout: no "${method}" notification received within ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      const resolver = (msg: JsonRpcMessage): void => {
+        clearTimeout(timer);
+        resolve(msg);
+      };
+
+      if (!this.pendingNotifications.has(method)) {
+        this.pendingNotifications.set(method, []);
+      }
+      this.pendingNotifications.get(method)!.push(resolver);
+    });
   }
 
   /**
@@ -320,6 +355,165 @@ describe('LSP integration tests', () => {
 
       expect(definitionResponse.error).toBeUndefined();
       expect(definitionResponse.result).toBeNull();
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns definition location for a namespace path', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-definition-namespace.twig').toString();
+      const docText = "{% include '@example/molecules/card/card.twig' %}";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      // Cursor at character 20 — inside the namespace path
+      const definitionResponse = await client.request('textDocument/definition', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: 20 },
+      });
+
+      expect(definitionResponse.error).toBeUndefined();
+      const location = definitionResponse.result;
+      expect(location).not.toBeNull();
+      expect(location.uri).toContain('card.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('returns definition location for a non-SDC template under components/', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-definition-extends.twig').toString();
+      const docText =
+        "{% extends '@example/components/shared/layout/sectioned-content.twig' %}";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      // Cursor at character 30 — inside the namespace path
+      const definitionResponse = await client.request('textDocument/definition', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: 30 },
+      });
+
+      expect(definitionResponse.error).toBeUndefined();
+      const location = definitionResponse.result;
+      expect(location).not.toBeNull();
+      expect(location.uri).toContain('sectioned-content.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('resolves an SDC twig referenced by its full theme-root path via suffix match', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-definition-fullpath.twig').toString();
+      // The SDC index stores the stripped form (@example/molecules/card/card.twig);
+      // this full theme-root form only resolves through the suffix fallback.
+      const docText = "{% include '@example/components/molecules/card/card.twig' %}";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const definitionResponse = await client.request('textDocument/definition', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: 30 },
+      });
+
+      expect(definitionResponse.error).toBeUndefined();
+      const location = definitionResponse.result;
+      expect(location).not.toBeNull();
+      expect(location.uri).toContain('card.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('tags completion items with the language server source', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-source-label.twig').toString();
+      const docText = "{% include '";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = toItemArray(completionResponse.result) as Array<{
+        labelDetails?: { description?: string };
+      }>;
+      expect(items.length).toBeGreaterThan(0);
+      expect(items.every((item) => item.labelDetails?.description === 'drupal-sdc-lsp')).toBe(true);
 
       await client.request('shutdown', undefined);
       client.notify('exit', undefined);
@@ -620,6 +814,90 @@ describe('LSP integration tests', () => {
       // Template files from fixtures/example/templates/ should appear
       expect(labels).toContain('@example/layout/page.twig');
       expect(labels).toContain('@example/_includes/section.html.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('publishes a warning diagnostic for an unknown component ID', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-diagnostics.twig').toString();
+      const docText = "{% include 'example:nonexistent' %}";
+
+      // Set up notification listener before opening the document
+      const diagPromise = client.waitForNotification('textDocument/publishDiagnostics', 5000);
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const notification = await diagPromise;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const params = notification.params as any;
+
+      expect(params.uri).toBe(docUri);
+      expect(Array.isArray(params.diagnostics)).toBe(true);
+      expect(params.diagnostics.length).toBeGreaterThan(0);
+
+      const diag = params.diagnostics[0];
+      expect(diag.severity).toBe(2); // DiagnosticSeverity.Warning
+      expect(diag.message).toContain('example:nonexistent');
+      expect(diag.source).toBe('drupal-sdc-lsp');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('clears diagnostics when a document is closed', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-diagnostics-close.twig').toString();
+      const docText = "{% include 'example:nonexistent' %}";
+
+      // Open and wait for the initial diagnostic
+      const openDiagPromise = client.waitForNotification('textDocument/publishDiagnostics', 5000);
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+      await openDiagPromise;
+
+      // Close and wait for the cleared diagnostic
+      const closeDiagPromise = client.waitForNotification('textDocument/publishDiagnostics', 5000);
+      client.notify('textDocument/didClose', { textDocument: { uri: docUri } });
+      const closeNotification = await closeDiagPromise;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const params = closeNotification.params as any;
+      expect(params.diagnostics).toEqual([]);
 
       await client.request('shutdown', undefined);
       client.notify('exit', undefined);

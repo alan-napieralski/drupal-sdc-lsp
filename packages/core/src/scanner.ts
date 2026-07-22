@@ -95,19 +95,25 @@ async function walkDirectory(
 // ---------------------------------------------------------------------------
 
 /**
- * Recursively walks a directory tree and returns `TwigFileEntry` records for
- * all `*.twig` files found under any `templates/` directory.
+ * Recursively walks a directory tree and returns `TwigFileEntry` records for all
+ * non-SDC `*.twig` files found under any `templates/` or `components/` directory.
  *
  * The namespace path is derived as `@{provider}/{relative/path.twig}` where
- * `provider` is the directory segment immediately before `templates/` and the
- * relative path is everything after `templates/`.
+ * `provider` is the directory segment immediately before the `templates/` or
+ * `components/` root. Files under `templates/` drop that segment (`@provider/…`);
+ * files under `components/` keep it (`@provider/components/…`), matching how
+ * theme-root namespaces reference shared layouts and partials.
  *
- * Used to power `@namespace/path.twig` completions for non-SDC templates.
+ * SDC twig files (those with a `.component.yml` sibling) are excluded — they are
+ * served by the component index, not this one.
+ *
+ * Used to power `@namespace/path.twig` completions and go-to-definition for
+ * non-SDC templates.
  *
  * Never throws — all filesystem errors are caught and logged to stderr.
  *
  * @param rootDir - Absolute path to start scanning from
- * @returns TwigFileEntry records for all discovered template files
+ * @returns TwigFileEntry records for all discovered non-SDC template files
  */
 export async function scanForTwigTemplateFiles(rootDir: string): Promise<TwigFileEntry[]> {
   const results: TwigFileEntry[] = [];
@@ -161,44 +167,65 @@ async function walkForTwigFiles(
 
       if (stat.isDirectory()) {
         visitedRealPaths.add(realPath);
-        const [newProvider, newParts] = resolveTemplatesDir(entry.name, dir, provider, relPathParts);
+        const [newProvider, newParts] = resolveNamespaceRoot(entry.name, dir, provider, relPathParts);
         await walkForTwigFiles(realPath, newProvider, newParts, visitedRealPaths, results);
       } else if (stat.isFile() && provider !== null && entry.name.endsWith('.twig')) {
-        results.push(makeTwigEntry(entryPath, provider, relPathParts, entry.name));
+        if (!(await hasComponentYamlSibling(dir, entry.name))) {
+          results.push(makeTwigEntry(entryPath, provider, relPathParts, entry.name));
+        }
       }
       continue;
     }
 
     if (entry.isDirectory()) {
-      const [newProvider, newParts] = resolveTemplatesDir(entry.name, dir, provider, relPathParts);
+      const [newProvider, newParts] = resolveNamespaceRoot(entry.name, dir, provider, relPathParts);
       await walkForTwigFiles(entryPath, newProvider, newParts, visitedRealPaths, results);
       continue;
     }
 
     if (entry.isFile() && provider !== null && entry.name.endsWith('.twig')) {
-      results.push(makeTwigEntry(entryPath, provider, relPathParts, entry.name));
+      if (!(await hasComponentYamlSibling(dir, entry.name))) {
+        results.push(makeTwigEntry(entryPath, provider, relPathParts, entry.name));
+      }
     }
   }
 }
 
 /**
  * Determines the new provider and relative path parts when descending into a
- * directory. When entering a `templates/` directory for the first time, sets
- * the provider from the parent directory name and resets the relative path.
+ * directory. The provider is the segment before the first `templates/` or
+ * `components/` root; `templates/` drops from the path, `components/` stays.
  */
-function resolveTemplatesDir(
+function resolveNamespaceRoot(
   dirName: string,
   parentDir: string,
   currentProvider: string | null,
   currentParts: string[],
 ): [string | null, string[]] {
-  if (dirName === 'templates' && currentProvider === null) {
-    return [path.basename(parentDir), []];
-  }
   if (currentProvider !== null) {
     return [currentProvider, [...currentParts, dirName]];
   }
+  if (dirName === 'templates') {
+    return [path.basename(parentDir), []];
+  }
+  if (dirName === 'components') {
+    return [path.basename(parentDir), ['components']];
+  }
   return [null, []];
+}
+
+/**
+ * Reports whether a `.twig` file has a sibling `.component.yml`, marking it as an
+ * SDC component template that this scanner must skip.
+ */
+async function hasComponentYamlSibling(dir: string, twigFileName: string): Promise<boolean> {
+  const base = twigFileName.slice(0, -'.twig'.length);
+  try {
+    await fs.promises.access(path.join(dir, `${base}.component.yml`), fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function makeTwigEntry(
