@@ -364,6 +364,85 @@ describe('LSP integration tests', () => {
     }
   }, 30000);
 
+  it('returns definition location for a namespace path', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-definition-namespace.twig').toString();
+      const docText = "{% include '@example/molecules/card/card.twig' %}";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      // Cursor at character 20 — inside the namespace path
+      const definitionResponse = await client.request('textDocument/definition', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: 20 },
+      });
+
+      expect(definitionResponse.error).toBeUndefined();
+      const location = definitionResponse.result;
+      expect(location).not.toBeNull();
+      expect(location.uri).toContain('card.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('tags completion items with the language server source', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-source-label.twig').toString();
+      const docText = "{% include '";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const completionResponse = await client.request('textDocument/completion', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: docText.length },
+      });
+
+      expect(completionResponse.error).toBeUndefined();
+      const items = toItemArray(completionResponse.result) as Array<{
+        labelDetails?: { description?: string };
+      }>;
+      expect(items.length).toBeGreaterThan(0);
+      expect(items.every((item) => item.labelDetails?.description === 'drupal-sdc-lsp')).toBe(true);
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
   it('returns prop completions inside with {} block', async () => {
     if (!fs.existsSync(SERVER_DIST)) {
       console.warn('Skipping: server not built');

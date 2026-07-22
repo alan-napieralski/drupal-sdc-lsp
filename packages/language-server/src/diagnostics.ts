@@ -1,6 +1,7 @@
 import { Diagnostic, DiagnosticSeverity } from 'vscode-languageserver/node.js';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import type { SDCRegistry } from '@drupal-sdc-lsp/core';
+import { SERVER_NAME } from './metadata.js';
 
 /**
  * Matches SDC component IDs inside {% include %} and {% embed %} Twig tags.
@@ -52,7 +53,7 @@ export function getDiagnostics(document: TextDocument, registry: SDCRegistry): D
         end: document.positionAt(idEnd),
       },
       message: `Unknown SDC component: "${componentId}"`,
-      source: 'drupal-sdc-lsp',
+      source: SERVER_NAME,
     });
   }
 

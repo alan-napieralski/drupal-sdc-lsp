@@ -17,8 +17,15 @@ import type { SDCRegistry, InvocationContext } from '@drupal-sdc-lsp/core';
 import { detectInvocationContext } from '@drupal-sdc-lsp/core';
 import type { Logger } from './logger.js';
 import { getTwigTagSnippets, getTwigWordSnippets } from './twig-snippets.js';
+import { SERVER_NAME } from './metadata.js';
 
 const MAX_LINE_LENGTH = 10000;
+
+/**
+ * Source tag shown on every completion item's right-hand detail so the user can
+ * see which language server produced the suggestion.
+ */
+const SOURCE_LABEL = SERVER_NAME;
 
 /**
  * Pattern that matches the partial input of an include/embed/extends string literal.
@@ -93,7 +100,40 @@ export async function getCompletions(
   logger: Logger,
   token: CancellationToken,
   enableGenericSnippets: boolean = true,
-): Promise<CompletionItem[]> {
+): Promise<CompletionItem[] | CompletionList> {
+  const result = await collectCompletions(
+    params,
+    documents,
+    registry,
+    logger,
+    token,
+    enableGenericSnippets,
+  );
+  return tagWithSource(result);
+}
+
+/**
+ * Stamps every completion item with the source label so the editor shows which
+ * language server produced it. Handles both plain arrays and `CompletionList`.
+ */
+function tagWithSource(
+  result: CompletionItem[] | CompletionList,
+): CompletionItem[] | CompletionList {
+  const items = Array.isArray(result) ? result : result.items;
+  for (const item of items) {
+    item.labelDetails = { ...item.labelDetails, description: SOURCE_LABEL };
+  }
+  return result;
+}
+
+async function collectCompletions(
+  params: CompletionParams,
+  documents: TextDocuments<TextDocument>,
+  registry: SDCRegistry,
+  logger: Logger,
+  token: CancellationToken,
+  enableGenericSnippets: boolean = true,
+): Promise<CompletionItem[] | CompletionList> {
   const doc = documents.get(params.textDocument.uri);
   if (doc === undefined) return [];
 

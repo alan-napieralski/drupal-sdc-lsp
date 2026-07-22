@@ -5,6 +5,12 @@
 const COMPONENT_ID_PATTERN = /[a-z0-9_][a-z0-9_-]*:[a-z0-9_][a-z0-9_-]*/g;
 
 /**
+ * Pattern that matches a `@provider/relative/path.twig` namespace path token.
+ * Allows letters, digits, underscores, hyphens, dots, and slashes after the provider.
+ */
+const NAMESPACE_PATH_PATTERN = /@[a-z0-9_-]+\/[a-z0-9_\-./]+/gi;
+
+/**
  * Describes a matched component ID token and its position within a line.
  */
 export interface ComponentIdToken {
@@ -29,6 +35,32 @@ export function extractComponentIdTokenAtOffset(
 
   let match: RegExpExecArray | null;
   while ((match = COMPONENT_ID_PATTERN.exec(lineText)) !== null) {
+    const tokenStart = match.index;
+    const tokenEnd = tokenStart + match[0].length;
+
+    if (characterOffset >= tokenStart && characterOffset <= tokenEnd) {
+      return { id: match[0], start: tokenStart, end: tokenEnd };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extracts the `@provider/path.twig` namespace path token spanning the cursor.
+ *
+ * @param lineText - Full text of the line
+ * @param characterOffset - Zero-based cursor position within the line
+ * @returns The matched token with position info, or `null` if none spans the cursor
+ */
+export function extractNamespacePathTokenAtOffset(
+  lineText: string,
+  characterOffset: number,
+): ComponentIdToken | null {
+  NAMESPACE_PATH_PATTERN.lastIndex = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = NAMESPACE_PATH_PATTERN.exec(lineText)) !== null) {
     const tokenStart = match.index;
     const tokenEnd = tokenStart + match[0].length;
 

@@ -5,18 +5,22 @@ import type { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 import type { SDCRegistry } from '@drupal-sdc-lsp/core';
 import type { Logger } from './logger.js';
-import { extractComponentIdTokenAtOffset } from './token-extractor.js';
+import {
+  extractComponentIdTokenAtOffset,
+  extractNamespacePathTokenAtOffset,
+} from './token-extractor.js';
 
 /** A zero-width range at the top of a file — sufficient for go-to-definition. */
 const TOP_OF_FILE_RANGE = Range.create(0, 0, 0, 0);
 
 /**
- * Resolves a go-to-definition request for a Drupal SDC component ID.
+ * Resolves a go-to-definition request for a Drupal SDC component reference.
  *
- * Extracts the token under the cursor, looks it up in the registry, validates
- * the target file exists on disk, and returns an LSP `Location`.
+ * Handles both `provider:component` IDs and `@provider/path.twig` namespace
+ * paths under the cursor, looks the reference up in the registry, validates the
+ * target file exists on disk, and returns an LSP `Location`.
  *
- * Returns `null` — never throws — when the token is not a known component ID,
+ * Returns `null` — never throws — when the token is not a known reference,
  * when the target file does not exist, or on any error.
  *
  * @param params - LSP definition request parameters
@@ -37,23 +41,14 @@ export async function getDefinition(
   }
 
   const lineText = doc.getText().split('\n')[params.position.line] ?? '';
-
-  const token = extractComponentIdTokenAtOffset(lineText, params.position.character);
-  if (token === null) {
-    return null;
-  }
-  const componentId = token.id;
+  const cursor = params.position.character;
 
   await registry.readyPromise;
 
-  const component = registry.getById(componentId);
-  if (component === undefined) {
-    logger.debug(`No component found for ID: ${componentId}`);
+  const targetPath = resolveTargetPath(lineText, cursor, registry, logger);
+  if (targetPath === null) {
     return null;
   }
-
-  // Prefer the .twig file; fall back to .component.yml
-  const targetPath = component.twigFilePath ?? component.yamlFilePath;
 
   const fileExists = await checkFileExists(targetPath);
   if (!fileExists) {
@@ -65,6 +60,51 @@ export async function getDefinition(
     uri: URI.file(targetPath).toString(),
     range: TOP_OF_FILE_RANGE,
   };
+}
+
+/**
+ * Resolves the definition target file for whichever reference token spans the
+ * cursor — a `provider:component` ID or a `@provider/path.twig` namespace path.
+ *
+ * @param lineText - The full text of the line under the cursor
+ * @param cursor - Zero-based cursor character offset within the line
+ * @param registry - SDC component registry
+ * @param logger - Structured logger
+ * @returns Absolute path to the target file, or null if nothing resolves
+ */
+function resolveTargetPath(
+  lineText: string,
+  cursor: number,
+  registry: SDCRegistry,
+  logger: Logger,
+): string | null {
+  const idToken = extractComponentIdTokenAtOffset(lineText, cursor);
+  if (idToken !== null) {
+    const component = registry.getById(idToken.id);
+    if (component === undefined) {
+      logger.debug(`No component found for ID: ${idToken.id}`);
+      return null;
+    }
+    return component.twigFilePath ?? component.yamlFilePath;
+  }
+
+  const pathToken = extractNamespacePathTokenAtOffset(lineText, cursor);
+  if (pathToken === null) {
+    return null;
+  }
+
+  const component = registry.getByNamespacePath(pathToken.id);
+  if (component !== undefined) {
+    return component.twigFilePath ?? component.yamlFilePath;
+  }
+
+  const twigEntry = registry.getTwigEntryByNamespacePath(pathToken.id);
+  if (twigEntry !== undefined) {
+    return twigEntry.absolutePath;
+  }
+
+  logger.debug(`No component or template found for namespace path: ${pathToken.id}`);
+  return null;
 }
 
 /**

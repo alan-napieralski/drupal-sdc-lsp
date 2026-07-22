@@ -19,6 +19,7 @@ import { getHover } from './hover.js';
 import { setupWatcher } from './watcher.js';
 import { getSemanticTokens, SEMANTIC_TOKEN_LEGEND } from './semantic-tokens.js';
 import { getDiagnostics } from './diagnostics.js';
+import { SERVER_NAME } from './metadata.js';
 
 // Validate CLI arguments — only --stdio is accepted
 const knownFlags = new Set(['--stdio']);
@@ -97,7 +98,7 @@ connection.onInitialized(() => {
       .showMessage({
         type: MessageType.Warning,
         message:
-          'drupal-sdc-lsp: Could not determine workspace root. ' +
+          `${SERVER_NAME}: Could not determine workspace root. ` +
           'Component completions will not be available.',
       })
       .catch(() => {
@@ -118,7 +119,7 @@ connection.onInitialized(() => {
   // Start file watcher for incremental re-indexing; re-validate open docs on every registry change
   disposeWatcher = setupWatcher(connection, registry, workspaceRoot, logger, validateAllOpenDocuments);
 
-  logger.info(`drupal-sdc-lsp initialized. Indexing: ${workspaceRoot}`);
+  logger.info(`${SERVER_NAME} initialized. Indexing: ${workspaceRoot}`);
 });
 
 connection.onCompletion(async (params, token) => {
@@ -195,12 +196,6 @@ function validateAllOpenDocuments(): void {
     });
   }
 }
-
-documents.onDidOpen((event) => {
-  validateDocument(event.document).catch((err: unknown) => {
-    logger.error(`Diagnostics error on open for ${event.document.uri}: ${String(err)}`);
-  });
-});
 
 documents.onDidChangeContent((change) => {
   validateDocument(change.document).catch((err: unknown) => {
