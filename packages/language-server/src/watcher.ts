@@ -22,6 +22,8 @@ const BULK_EVENT_THRESHOLD = 10;
  * @param registry - SDC component registry to update
  * @param workspaceRoot - Root directory of the workspace (used for bulk rebuilds)
  * @param logger - Structured logger
+ * @param onRegistryChange - Optional callback invoked after each registry mutation.
+ *   Use this to re-validate open documents whenever components are added, removed, or changed.
  * @returns A dispose function that clears all timers on shutdown
  */
 export function setupWatcher(
@@ -29,6 +31,7 @@ export function setupWatcher(
   registry: SDCRegistry,
   workspaceRoot: string,
   logger: Logger,
+  onRegistryChange?: () => void,
 ): () => void {
   const perFileTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let bulkTimer: ReturnType<typeof setTimeout> | null = null;
@@ -77,7 +80,9 @@ export function setupWatcher(
       bulkTimer = setTimeout(() => {
         bulkTimer = null;
         recentEventCount = 0;
-        registry.rebuild(workspaceRoot).catch((err: unknown) => {
+        registry.rebuild(workspaceRoot).then(() => {
+          onRegistryChange?.();
+        }).catch((err: unknown) => {
           logger.error(`Registry rebuild failed: ${String(err)}`);
         });
       }, BULK_DEBOUNCE_MS);
@@ -100,9 +105,12 @@ export function setupWatcher(
         if (change.type === FileChangeType.Deleted) {
           registry.removeComponent(filePath);
           logger.debug(`Removed component: ${filePath}`);
+          onRegistryChange?.();
         } else {
           // Created or Changed — re-parse and update
-          registry.updateComponent(filePath).catch((err: unknown) => {
+          registry.updateComponent(filePath).then(() => {
+            onRegistryChange?.();
+          }).catch((err: unknown) => {
             logger.error(`Failed to update component ${filePath}: ${String(err)}`);
           });
           logger.debug(`Updated component: ${filePath}`);
