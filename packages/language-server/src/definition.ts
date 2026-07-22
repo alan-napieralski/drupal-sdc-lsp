@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import type { DefinitionParams, Location, TextDocuments } from 'vscode-languageserver/node.js';
 import { Range } from 'vscode-languageserver/node.js'; // Range used for TOP_OF_FILE_RANGE
 import type { TextDocument } from 'vscode-languageserver-textdocument';
@@ -103,7 +104,65 @@ function resolveTargetPath(
     return twigEntry.absolutePath;
   }
 
+  const suffixMatch = resolveByPathSuffix(pathToken.id, registry);
+  if (suffixMatch !== null) {
+    return suffixMatch;
+  }
+
   logger.debug(`No component or template found for namespace path: ${pathToken.id}`);
+  return null;
+}
+
+/**
+ * Resolves a `@provider/relative/path.twig` reference by matching its trailing
+ * path against every indexed twig file, independent of how the provider maps to
+ * a directory. Returns a match only when it is unambiguous — a single hit, or a
+ * single hit whose path contains the provider segment.
+ *
+ * @param namespacePath - The `@provider/...twig` reference under the cursor
+ * @param registry - SDC component registry
+ * @returns Absolute path to the resolved twig file, or null if none/ambiguous
+ */
+function resolveByPathSuffix(namespacePath: string, registry: SDCRegistry): string | null {
+  const firstSlash = namespacePath.indexOf('/');
+  if (firstSlash === -1) {
+    return null;
+  }
+
+  const provider = namespacePath.slice(1, firstSlash);
+  const relativePath = namespacePath.slice(firstSlash + 1);
+  if (relativePath.length === 0) {
+    return null;
+  }
+
+  const suffix = `/${relativePath}`;
+  const candidatePaths: string[] = [];
+  for (const component of registry.getAllComponents()) {
+    if (component.twigFilePath !== null) {
+      candidatePaths.push(component.twigFilePath);
+    }
+  }
+  for (const entry of registry.getAllTwigEntries()) {
+    candidatePaths.push(entry.absolutePath);
+  }
+
+  const matches = candidatePaths.filter((candidate) =>
+    candidate.split(path.sep).join('/').endsWith(suffix),
+  );
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  if (matches.length > 1) {
+    const providerMatches = matches.filter((candidate) =>
+      candidate.split(path.sep).includes(provider),
+    );
+    if (providerMatches.length === 1) {
+      return providerMatches[0];
+    }
+  }
+
   return null;
 }
 

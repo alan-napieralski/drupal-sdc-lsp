@@ -403,6 +403,86 @@ describe('LSP integration tests', () => {
     }
   }, 30000);
 
+  it('returns definition location for a non-SDC template under components/', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-definition-extends.twig').toString();
+      const docText =
+        "{% extends '@example/components/shared/layout/sectioned-content.twig' %}";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      // Cursor at character 30 — inside the namespace path
+      const definitionResponse = await client.request('textDocument/definition', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: 30 },
+      });
+
+      expect(definitionResponse.error).toBeUndefined();
+      const location = definitionResponse.result;
+      expect(location).not.toBeNull();
+      expect(location.uri).toContain('sectioned-content.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
+  it('resolves an SDC twig referenced by its full theme-root path via suffix match', async () => {
+    if (!fs.existsSync(SERVER_DIST)) {
+      console.warn('Skipping: server not built');
+      return;
+    }
+
+    const client = spawnServer();
+    try {
+      await client.request('initialize', INIT_PARAMS);
+      client.notify('initialized', {});
+
+      await sleep(800);
+
+      const docUri = URI.file('/tmp/test-definition-fullpath.twig').toString();
+      // The SDC index stores the stripped form (@example/molecules/card/card.twig);
+      // this full theme-root form only resolves through the suffix fallback.
+      const docText = "{% include '@example/components/molecules/card/card.twig' %}";
+
+      client.notify('textDocument/didOpen', {
+        textDocument: { uri: docUri, languageId: 'twig', version: 1, text: docText },
+      });
+
+      const definitionResponse = await client.request('textDocument/definition', {
+        textDocument: { uri: docUri },
+        position: { line: 0, character: 30 },
+      });
+
+      expect(definitionResponse.error).toBeUndefined();
+      const location = definitionResponse.result;
+      expect(location).not.toBeNull();
+      expect(location.uri).toContain('card.twig');
+
+      await client.request('shutdown', undefined);
+      client.notify('exit', undefined);
+      await client.waitForExit();
+    } finally {
+      client.kill();
+    }
+  }, 30000);
+
   it('tags completion items with the language server source', async () => {
     if (!fs.existsSync(SERVER_DIST)) {
       console.warn('Skipping: server not built');
