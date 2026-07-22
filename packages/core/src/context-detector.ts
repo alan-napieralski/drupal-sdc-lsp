@@ -2,31 +2,19 @@ import type { InvocationContext } from './types.js';
 
 const LOOKBACK_LIMIT = 2000;
 
-/**
- * Pattern that matches an include/embed followed by a component ID string and an
- * opening `with {`. The text after `{` is captured to extract already-used keys.
- *
- * Anchored to end-of-string (`$`) so the cursor must be inside the `with {}` block.
- */
+// Matches `include`/`embed` + component id + open `with {`, capturing text after the brace; anchored to end so the cursor sits inside the block.
 const INVOCATION_PATTERN =
   /(?:include|embed)\s+['"]([^'"]+)['"]\s+with\s+\{([^}]*)$/;
 
-/**
- * Matches key names already used in the `with {}` object literal.
- */
+// Matches key names already used in the `with {}` object literal.
 const USED_KEY_PATTERN = /(\w+)\s*:/g;
 
 /**
- * Detects whether the cursor is positioned inside a Twig `include/embed ... with { }` block.
- *
- * Returns an `InvocationContext` describing the component being called and the
- * prop keys already written, or `null` if the cursor is not in that position.
- *
- * Never throws on any input. Completes in under 1ms for typical inputs.
+ * Detects whether the cursor is inside a Twig `include/embed ... with { }` block.
  *
  * @param documentText - Full text of the Twig document
- * @param cursorOffset - Zero-based character offset of the cursor in `documentText`
- * @returns Context with componentId and already-used keys, or `null`
+ * @param cursorOffset - Zero-based character offset of the cursor in the document
+ * @returns Context with the component ID and already-used keys, or null if not in that position
  */
 export function detectInvocationContext(
   documentText: string,
@@ -40,9 +28,6 @@ export function detectInvocationContext(
   const lookbackStart = Math.max(0, safeOffset - LOOKBACK_LIMIT);
   const textBeforeCursor = documentText.slice(lookbackStart, safeOffset);
 
-  // Apply the pattern against the full lookback window so that multi-line
-  // `with {}` blocks are detected even when the cursor is on a different line
-  // than the include/embed statement.
   const match = INVOCATION_PATTERN.exec(textBeforeCursor);
   if (match === null) {
     return null;

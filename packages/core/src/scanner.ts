@@ -3,13 +3,11 @@ import * as path from 'path';
 import type { TwigFileEntry } from './types.js';
 
 /**
- * Recursively walks a directory tree and returns absolute paths of all
- * `*.component.yml` files found under any `components/` directory.
- *
- * Never throws — all filesystem errors are caught and logged to stderr.
+ * Scans a directory tree and returns all SDC component YAML paths.
+ * Never throws; filesystem errors are logged to stderr and skipped.
  *
  * @param rootDir - Absolute path to start scanning from
- * @returns Absolute paths of all discovered `.component.yml` files
+ * @returns Absolute paths of all discovered .component.yml files
  */
 export async function scanForComponentFiles(rootDir: string): Promise<string[]> {
   const results: string[] = [];
@@ -20,6 +18,14 @@ export async function scanForComponentFiles(rootDir: string): Promise<string[]> 
   return results;
 }
 
+/**
+ * Recursively walks a directory, collecting .component.yml paths under components/.
+ *
+ * @param dir - Directory to walk
+ * @param insideComponents - Whether the walk is already inside a components/ root
+ * @param visitedRealPaths - Resolved symlink targets already visited
+ * @param results - Accumulator for discovered .component.yml paths
+ */
 async function walkDirectory(
   dir: string,
   insideComponents: boolean,
@@ -90,27 +96,10 @@ async function walkDirectory(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Twig template file scanner
-// ---------------------------------------------------------------------------
-
 /**
- * Recursively walks a directory tree and returns `TwigFileEntry` records for all
- * non-SDC `*.twig` files found under any `templates/` or `components/` directory.
- *
- * The namespace path is derived as `@{provider}/{relative/path.twig}` where
- * `provider` is the directory segment immediately before the `templates/` or
- * `components/` root. Files under `templates/` drop that segment (`@provider/…`);
- * files under `components/` keep it (`@provider/components/…`), matching how
- * theme-root namespaces reference shared layouts and partials.
- *
- * SDC twig files (those with a `.component.yml` sibling) are excluded — they are
- * served by the component index, not this one.
- *
- * Used to power `@namespace/path.twig` completions and go-to-definition for
- * non-SDC templates.
- *
- * Never throws — all filesystem errors are caught and logged to stderr.
+ * Scans a directory tree and returns entries for non-SDC twig template files.
+ * Namespace is `@{provider}/…`; templates/ drops the root segment, components/ keeps it.
+ * Templates with a .component.yml sibling are excluded, and it never throws.
  *
  * @param rootDir - Absolute path to start scanning from
  * @returns TwigFileEntry records for all discovered non-SDC template files
@@ -122,6 +111,15 @@ export async function scanForTwigTemplateFiles(rootDir: string): Promise<TwigFil
   return results;
 }
 
+/**
+ * Recursively walks a directory, collecting non-SDC twig entries with namespace paths.
+ *
+ * @param dir - Directory to walk
+ * @param provider - Provider resolved so far, or null if not yet inside a root
+ * @param relPathParts - Relative path parts accumulated so far
+ * @param visitedRealPaths - Resolved symlink targets already visited
+ * @param results - Accumulator for discovered twig file entries
+ */
 async function walkForTwigFiles(
   dir: string,
   provider: string | null,
@@ -192,9 +190,13 @@ async function walkForTwigFiles(
 }
 
 /**
- * Determines the new provider and relative path parts when descending into a
- * directory. The provider is the segment before the first `templates/` or
- * `components/` root; `templates/` drops from the path, `components/` stays.
+ * Determines the provider and relative path parts when descending into a directory.
+ *
+ * @param dirName - Name of the directory being entered
+ * @param parentDir - Absolute path of the parent directory
+ * @param currentProvider - Provider resolved so far, or null if not yet inside a root
+ * @param currentParts - Relative path parts accumulated so far
+ * @returns The updated provider and relative path parts
  */
 function resolveNamespaceRoot(
   dirName: string,
@@ -215,8 +217,11 @@ function resolveNamespaceRoot(
 }
 
 /**
- * Reports whether a `.twig` file has a sibling `.component.yml`, marking it as an
- * SDC component template that this scanner must skip.
+ * Reports whether a twig file has a sibling .component.yml, marking it as an SDC template.
+ *
+ * @param dir - Directory containing the twig file
+ * @param twigFileName - Name of the twig file
+ * @returns True if a matching .component.yml sibling exists
  */
 async function hasComponentYamlSibling(dir: string, twigFileName: string): Promise<boolean> {
   const base = twigFileName.slice(0, -'.twig'.length);
@@ -228,6 +233,15 @@ async function hasComponentYamlSibling(dir: string, twigFileName: string): Promi
   }
 }
 
+/**
+ * Builds a TwigFileEntry from its path parts and provider.
+ *
+ * @param absolutePath - Absolute path to the twig file
+ * @param provider - Provider name
+ * @param relPathParts - Relative path parts from the namespace root
+ * @param fileName - Twig file name
+ * @returns The assembled twig file entry
+ */
 function makeTwigEntry(
   absolutePath: string,
   provider: string,

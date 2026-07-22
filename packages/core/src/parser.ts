@@ -4,13 +4,11 @@ import { parse } from 'yaml';
 import type { ComponentMetadata, PropDefinition, SlotDefinition } from './types.js';
 
 /**
- * Parses a Drupal SDC `.component.yml` file into a typed `ComponentMetadata` object.
+ * Parses a Drupal SDC `.component.yml` file into typed component metadata.
+ * Returns null (never throws) on unreadable, empty, malformed, or nameless YAML.
  *
- * Returns `null` — never throws — for: unreadable files, malformed YAML,
- * missing `name` field, or empty files.
- *
- * @param filePath - Absolute path to the `.component.yml` file
- * @returns Parsed metadata or `null` on any failure
+ * @param filePath - Absolute path to the .component.yml file
+ * @returns Parsed metadata, or null on any failure
  */
 export async function parseComponentYaml(filePath: string): Promise<ComponentMetadata | null> {
   let fileContent: string;
@@ -72,7 +70,10 @@ export async function parseComponentYaml(filePath: string): Promise<ComponentMet
 
 /**
  * Extracts prop definitions from the raw YAML `props` field.
- * Returns an empty array if the field is absent or has an unexpected shape.
+ *
+ * @param propsYaml - Raw value of the `props` field
+ * @param filePath - Absolute path to the source file, used for warnings
+ * @returns Parsed prop definitions, or an empty array on an absent or unexpected shape
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsing raw YAML
 function extractProps(propsYaml: any, filePath: string): PropDefinition[] {
@@ -124,7 +125,10 @@ function extractProps(propsYaml: any, filePath: string): PropDefinition[] {
 
 /**
  * Extracts slot definitions from the raw YAML `slots` field.
- * Returns an empty array if the field is absent or has an unexpected shape.
+ *
+ * @param slotsYaml - Raw value of the `slots` field
+ * @param filePath - Absolute path to the source file, used for warnings
+ * @returns Parsed slot definitions, or an empty array on an absent or unexpected shape
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parsing raw YAML
 function extractSlots(slotsYaml: any, filePath: string): SlotDefinition[] {
@@ -153,10 +157,10 @@ function extractSlots(slotsYaml: any, filePath: string): SlotDefinition[] {
 }
 
 /**
- * Infers the provider name by locating the `components` directory in the file path
- * and returning the segment immediately before it.
+ * Infers the provider name from the path segment before the components/ directory.
  *
- * Falls back to "unknown" with a warning if the pattern is not found.
+ * @param filePath - Absolute path to the .component.yml file
+ * @returns The provider name, or "unknown" if it cannot be inferred
  */
 function inferProvider(filePath: string): string {
   const segments = filePath.split(path.sep);
@@ -171,8 +175,10 @@ function inferProvider(filePath: string): string {
 }
 
 /**
- * Resolves the paired `.twig` file path by replacing `.component.yml` extension.
- * Returns `null` if the file does not exist on disk.
+ * Resolves the paired .twig file path for a component YAML file.
+ *
+ * @param yamlFilePath - Absolute path to the .component.yml file
+ * @returns The paired .twig path, or null if it does not exist on disk
  */
 async function resolveTwigFilePath(yamlFilePath: string): Promise<string | null> {
   const twigPath = yamlFilePath.replace(/\.component\.yml$/, '.twig');

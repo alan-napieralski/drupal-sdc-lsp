@@ -1,5 +1,6 @@
 import type { RemoteConsole } from 'vscode-languageserver/node.js';
 
+/** Severity levels a logger can emit, in ascending order. */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LOG_LEVEL_RANK: Record<LogLevel, number> = {
@@ -9,23 +10,23 @@ const LOG_LEVEL_RANK: Record<LogLevel, number> = {
   error: 3,
 };
 
-/**
- * Structured logger that delegates to the LSP connection's remote console
- * with configurable minimum log level.
- */
+/** Structured logger with a configurable minimum log level. */
 export interface Logger {
+  /** Logs a message at debug level. */
   debug(message: string): void;
+  /** Logs a message at info level. */
   info(message: string): void;
+  /** Logs a message at warning level. */
   warn(message: string): void;
+  /** Logs a message at error level. */
   error(message: string): void;
 }
 
 /**
- * Creates a logger that wraps `connection.console` and filters messages
- * below the specified minimum level.
+ * Creates a logger that wraps the remote console and filters by level.
  *
  * @param console - The LSP remote console from `connection.console`
-* @param level - Minimum level to emit (default: `"info"`)
+ * @param level - Minimum level to emit (default: `info`)
  * @returns A structured Logger instance
  */
 export function createLogger(console: RemoteConsole, level: LogLevel = 'info'): Logger {

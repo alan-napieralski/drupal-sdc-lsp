@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { DefinitionParams, Location, TextDocuments } from 'vscode-languageserver/node.js';
-import { Range } from 'vscode-languageserver/node.js'; // Range used for TOP_OF_FILE_RANGE
+import { Range } from 'vscode-languageserver/node.js';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 import type { SDCRegistry } from '@drupal-sdc-lsp/core';
@@ -11,24 +11,16 @@ import {
   extractNamespacePathTokenAtOffset,
 } from './token-extractor.js';
 
-/** A zero-width range at the top of a file — sufficient for go-to-definition. */
 const TOP_OF_FILE_RANGE = Range.create(0, 0, 0, 0);
 
 /**
- * Resolves a go-to-definition request for a Drupal SDC component reference.
- *
- * Handles both `provider:component` IDs and `@provider/path.twig` namespace
- * paths under the cursor, looks the reference up in the registry, validates the
- * target file exists on disk, and returns an LSP `Location`.
- *
- * Returns `null` — never throws — when the token is not a known reference,
- * when the target file does not exist, or on any error.
+ * Resolves a go-to-definition request for a component ID or namespace path.
  *
  * @param params - LSP definition request parameters
  * @param documents - Open document store
  * @param registry - SDC component registry
  * @param logger - Structured logger
- * @returns A Location pointing to the component's twig or yaml file, or null
+ * @returns A Location for the target file, or null if unresolved
  */
 export async function getDefinition(
   params: DefinitionParams,
@@ -64,10 +56,9 @@ export async function getDefinition(
 }
 
 /**
- * Resolves the definition target file for whichever reference token spans the
- * cursor — a `provider:component` ID or a `@provider/path.twig` namespace path.
+ * Resolves the target file for the reference token spanning the cursor.
  *
- * @param lineText - The full text of the line under the cursor
+ * @param lineText - Full text of the line under the cursor
  * @param cursor - Zero-based cursor character offset within the line
  * @param registry - SDC component registry
  * @param logger - Structured logger
@@ -114,14 +105,13 @@ function resolveTargetPath(
 }
 
 /**
- * Resolves a `@provider/relative/path.twig` reference by matching its trailing
- * path against every indexed twig file, independent of how the provider maps to
- * a directory. Returns a match only when it is unambiguous — a single hit, or a
- * single hit whose path contains the provider segment.
+ * Resolves a namespace path by matching its trailing path against indexed twig files.
+ *
+ * Returns a match only when it is unambiguous.
  *
  * @param namespacePath - The `@provider/...twig` reference under the cursor
  * @param registry - SDC component registry
- * @returns Absolute path to the resolved twig file, or null if none/ambiguous
+ * @returns Absolute path to the resolved twig file, or null if none or ambiguous
  */
 function resolveByPathSuffix(namespacePath: string, registry: SDCRegistry): string | null {
   const firstSlash = namespacePath.indexOf('/');
@@ -167,10 +157,10 @@ function resolveByPathSuffix(namespacePath: string, registry: SDCRegistry): stri
 }
 
 /**
- * Checks whether a file exists on disk at the given path.
+ * Checks whether a file exists on disk.
  *
  * @param filePath - Absolute filesystem path to check
- * @returns `true` if the file is accessible, `false` otherwise
+ * @returns True if the file is accessible, false otherwise
  */
 async function checkFileExists(filePath: string): Promise<boolean> {
   try {

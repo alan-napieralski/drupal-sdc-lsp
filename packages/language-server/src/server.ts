@@ -1,4 +1,4 @@
-// Safety: redirect console.log to stderr to protect the LSP protocol stream
+// Redirect console.log to stderr to protect the LSP stdio protocol stream.
 console.log = (...args: unknown[]) => console.error('[LOG]', ...args);
 
 import {
@@ -21,7 +21,6 @@ import { getSemanticTokens, SEMANTIC_TOKEN_LEGEND } from './semantic-tokens.js';
 import { getDiagnostics } from './diagnostics.js';
 import { SERVER_NAME } from './metadata.js';
 
-// Validate CLI arguments — only --stdio is accepted
 const knownFlags = new Set(['--stdio']);
 const unknownFlags = process.argv.slice(2).filter((arg) => !knownFlags.has(arg));
 if (unknownFlags.length > 0) {
@@ -29,18 +28,15 @@ if (unknownFlags.length > 0) {
   process.exit(1);
 }
 
-// Guard against unhandled promise rejections crashing the server
 process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[error] Unhandled rejection: ${String(reason)}\n`);
 });
 
-// Guard against uncaught exceptions — log and exit cleanly for supervisor restart
 process.on('uncaughtException', (err) => {
   process.stderr.write(`[error] Uncaught exception: ${String(err)}\n`);
   process.exit(1);
 });
 
-// Bootstrap LSP connection before any other stdout activity
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments<TextDocument>(TextDocument);
 
@@ -52,13 +48,11 @@ let disposeWatcher: (() => void) | null = null;
 let enableGenericSnippets = true;
 
 connection.onInitialize((params) => {
-  // Read initializationOptions
   const initOptions = params.initializationOptions as Record<string, unknown> | undefined;
   if (initOptions?.enableGenericTwigSnippets === false) {
     enableGenericSnippets = false;
   }
 
-  // Resolve workspace root from workspaceFolders or rootUri (never rootPath)
   if (params.workspaceFolders && params.workspaceFolders.length > 0) {
     const firstFolder = params.workspaceFolders[0];
     workspaceRoot = URI.parse(firstFolder.uri).fsPath;
@@ -72,7 +66,6 @@ connection.onInitialize((params) => {
     workspaceRoot = URI.parse(params.rootUri).fsPath;
   }
 
-  // Return capabilities immediately — do NOT await registry build
   return {
     capabilities: {
       positionEncoding: PositionEncodingKind.UTF16,
@@ -101,9 +94,7 @@ connection.onInitialized(() => {
           `${SERVER_NAME}: Could not determine workspace root. ` +
           'Component completions will not be available.',
       })
-      .catch(() => {
-        // Ignore if window/showMessage is not supported
-      });
+      .catch(() => {});
 
     registry.build('').catch((err: unknown) => {
       logger.error(`Registry build failed: ${String(err)}`);
@@ -111,12 +102,10 @@ connection.onInitialized(() => {
     return;
   }
 
-  // Start async indexing — does not block the initialized response
   registry.build(workspaceRoot).catch((err: unknown) => {
     logger.error(`Registry build failed: ${String(err)}`);
   });
 
-  // Start file watcher for incremental re-indexing; re-validate open docs on every registry change
   disposeWatcher = setupWatcher(connection, registry, workspaceRoot, logger, validateAllOpenDocuments);
 
   logger.info(`${SERVER_NAME} initialized. Indexing: ${workspaceRoot}`);
@@ -179,16 +168,18 @@ connection.onExit(() => {
   process.exit(0);
 });
 
-// ---------------------------------------------------------------------------
-// Diagnostics
-// ---------------------------------------------------------------------------
-
+/**
+ * Publishes diagnostics for a single document once the registry is ready.
+ *
+ * @param doc - The document to validate
+ */
 async function validateDocument(doc: TextDocument): Promise<void> {
   await registry.readyPromise;
   const diagnostics = getDiagnostics(doc, registry);
   connection.sendDiagnostics({ uri: doc.uri, diagnostics });
 }
 
+/** Re-validates every open document. */
 function validateAllOpenDocuments(): void {
   for (const doc of documents.all()) {
     validateDocument(doc).catch((err: unknown) => {

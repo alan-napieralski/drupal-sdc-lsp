@@ -5,14 +5,7 @@ import type { SDCRegistry, ComponentMetadata } from '@drupal-sdc-lsp/core';
 import { extractComponentIdTokenAtOffset } from './token-extractor.js';
 
 /**
- * Returns hover documentation for the Drupal SDC component ID under the cursor.
- *
- * Shows the component name, description, a props table (with types and required
- * status), and a slots table. Returns `null` when the cursor is not over a
- * known component ID.
- *
- * The response is standard LSP `Hover` with `MarkupContent` markdown — rendered
- * automatically on mouse-over in VS Code and on demand (e.g. `K`) in Neovim.
+ * Returns hover documentation for the SDC component ID under the cursor.
  *
  * @param params - LSP hover request params
  * @param documents - Open document store
@@ -49,7 +42,10 @@ export async function getHover(
 }
 
 /**
- * Builds the markdown string for hover documentation from component metadata.
+ * Builds the hover markdown from component metadata.
+ *
+ * @param component - The component to document
+ * @returns Markdown with the name, description, props table, and slots table
  */
 function buildHoverMarkdown(component: ComponentMetadata): string {
   const lines: string[] = [`### ${component.name}`];

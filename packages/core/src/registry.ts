@@ -3,12 +3,7 @@ import { scanForComponentFiles, scanForTwigTemplateFiles } from './scanner.js';
 import { parseComponentYaml } from './parser.js';
 import type { ComponentMetadata, TwigFileEntry } from './types.js';
 
-/**
- * In-memory index of all Drupal SDC components discovered in a workspace.
- *
- * All lookup methods are synchronous — safe to call on hot paths.
- * The `readyPromise` gate prevents race conditions at startup.
- */
+/** In-memory index of all Drupal SDC components discovered in a workspace. */
 export class SDCRegistry {
   private indexById: Map<string, ComponentMetadata> = new Map();
   private indexByNamespacePath: Map<string, ComponentMetadata> = new Map();
@@ -26,8 +21,7 @@ export class SDCRegistry {
   }
 
   /**
-   * Scans `rootDir`, parses all discovered YAML files, and populates the index.
-   * Resolves `readyPromise` on completion.
+   * Scans the workspace, parses all discovered YAML files, and populates the index.
    *
    * @param rootDir - Workspace root directory to scan
    */
@@ -63,8 +57,8 @@ export class SDCRegistry {
   }
 
   /**
-   * Builds a new index in temporary maps, then atomically swaps on success.
-   * The old index remains fully readable throughout the rebuild.
+   * Rebuilds the index in temporary maps, then swaps atomically on success.
+   * The old index stays fully readable throughout the rebuild.
    *
    * @param rootDir - Workspace root directory to scan
    */
@@ -103,7 +97,6 @@ export class SDCRegistry {
       tempByStandaloneTwig.set(entry.namespacePath, entry);
     }
 
-    // Atomic swap — single-threaded JS makes this safe
     this.indexById = tempById;
     this.indexByNamespacePath = tempByNamespacePath;
     this.indexByYamlPath = tempByYamlPath;
@@ -118,10 +111,9 @@ export class SDCRegistry {
   }
 
   /**
-   * Re-parses a single YAML file and updates its entry in-place.
-   * Used by the file watcher for incremental updates.
+   * Re-parses a single YAML file and updates its entry in place.
    *
-   * @param yamlFilePath - Absolute path to the changed `.component.yml` file
+   * @param yamlFilePath - Absolute path to the changed .component.yml file
    */
   async updateComponent(yamlFilePath: string): Promise<void> {
     const metadata = await parseComponentYaml(yamlFilePath);
@@ -135,7 +127,7 @@ export class SDCRegistry {
   /**
    * Removes a component from the index by its YAML file path.
    *
-   * @param yamlFilePath - Absolute path to the deleted `.component.yml` file
+   * @param yamlFilePath - Absolute path to the deleted .component.yml file
    */
   removeComponent(yamlFilePath: string): void {
     const metadata = this.indexByYamlPath.get(yamlFilePath);
@@ -155,20 +147,20 @@ export class SDCRegistry {
   }
 
   /**
-   * Looks up a component by its machine ID (e.g. `"example:wysiwyg"`).
+   * Looks up a component by its machine ID.
    *
-   * @param id - Component ID in `"provider:name"` format
-   * @returns The matching component metadata, or `undefined` if not found
+   * @param id - Component ID in "provider:name" format
+   * @returns The matching component metadata, or undefined if not found
    */
   getById(id: string): ComponentMetadata | undefined {
     return this.indexById.get(id);
   }
 
   /**
-   * Looks up a component by its Twig namespace path (e.g. `"@example/atoms/wysiwyg/wysiwyg.twig"`).
+   * Looks up a component by its Twig namespace path.
    *
    * @param namespacePath - Namespace path starting with `@provider/`
-   * @returns The matching component metadata, or `undefined` if not found
+   * @returns The matching component metadata, or undefined if not found
    */
   getByNamespacePath(namespacePath: string): ComponentMetadata | undefined {
     return this.indexByNamespacePath.get(namespacePath);
@@ -177,7 +169,7 @@ export class SDCRegistry {
   /**
    * Returns all components from a specific provider.
    *
-   * @param provider - Provider name (e.g. `"example"`)
+   * @param provider - Provider name
    * @returns All indexed components from that provider
    */
   getByProvider(provider: string): ComponentMetadata[] {
@@ -189,7 +181,7 @@ export class SDCRegistry {
   /**
    * Case-insensitive substring search across component IDs and names.
    *
-   * @param query - Search string (case-insensitive)
+   * @param query - Search string
    * @returns All components whose ID or name contains the query
    */
   search(query: string): ComponentMetadata[] {
@@ -212,7 +204,8 @@ export class SDCRegistry {
 
   /**
    * Returns all indexed non-SDC twig template file entries.
-   * Used to power `@namespace/path.twig` completions for regular templates.
+   *
+   * @returns Every standalone twig file entry in the registry
    */
   getAllTwigEntries(): TwigFileEntry[] {
     return Array.from(this.indexByStandaloneTwig.values());
@@ -222,13 +215,17 @@ export class SDCRegistry {
    * Looks up a non-SDC twig template entry by its namespace path.
    *
    * @param namespacePath - Namespace path starting with `@provider/`
-   * @returns The matching twig file entry, or `undefined` if not found
+   * @returns The matching twig file entry, or undefined if not found
    */
   getTwigEntryByNamespacePath(namespacePath: string): TwigFileEntry | undefined {
     return this.indexByStandaloneTwig.get(namespacePath);
   }
 
-  /** Internal helper to add or update a component in all three indexes. */
+  /**
+   * Adds or updates a component across all indexes.
+   *
+   * @param metadata - Parsed component metadata to index
+   */
   private indexComponent(metadata: ComponentMetadata): void {
     this.indexById.set(metadata.id, metadata);
     this.indexByYamlPath.set(metadata.yamlFilePath, metadata);
@@ -243,10 +240,11 @@ export class SDCRegistry {
 }
 
 /**
- * Derives the `@provider/relative/path.twig` namespace path from a twig file's
- * absolute path and provider name.
+ * Derives the `@provider/relative/path.twig` namespace path for a twig file.
  *
- * Returns `null` if the `components/` directory cannot be located in the path.
+ * @param provider - Provider name
+ * @param twigFilePath - Absolute path to the twig file
+ * @returns The namespace path, or null if the components/ directory is not in the path
  */
 function buildNamespacePath(provider: string, twigFilePath: string): string | null {
   const segments = twigFilePath.split(path.sep);
@@ -263,10 +261,10 @@ function buildNamespacePath(provider: string, twigFilePath: string): string | nu
 }
 
 /**
- * Convenience factory that creates a registry and runs the initial build.
+ * Creates a registry and runs the initial build.
  *
  * @param rootDir - Workspace root directory to scan
- * @returns A ready `SDCRegistry` instance (readyPromise already resolved)
+ * @returns A ready SDCRegistry instance
  */
 export async function buildRegistry(rootDir: string): Promise<SDCRegistry> {
   const registry = new SDCRegistry();

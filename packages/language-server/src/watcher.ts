@@ -12,18 +12,13 @@ const BULK_DEBOUNCE_MS = 500;
 const BULK_EVENT_THRESHOLD = 10;
 
 /**
- * Sets up the file watcher that keeps the SDC registry current as `.component.yml`
- * files are created, modified, or deleted during an editing session.
- *
- * Uses `workspace/didChangeWatchedFiles` dynamic registration to delegate watching
- * to the editor client, which handles platform-specific file watching reliably.
+ * Sets up the watcher that keeps the registry current as `.component.yml` files change.
  *
  * @param connection - Active LSP connection
  * @param registry - SDC component registry to update
- * @param workspaceRoot - Root directory of the workspace (used for bulk rebuilds)
+ * @param workspaceRoot - Root directory of the workspace, used for bulk rebuilds
  * @param logger - Structured logger
- * @param onRegistryChange - Optional callback invoked after each registry mutation.
- *   Use this to re-validate open documents whenever components are added, removed, or changed.
+ * @param onRegistryChange - Optional callback invoked after each registry mutation
  * @returns A dispose function that clears all timers on shutdown
  */
 export function setupWatcher(
@@ -38,7 +33,6 @@ export function setupWatcher(
   let recentEventCount = 0;
   let recentEventWindowTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Register with the client to watch all .component.yml files
   connection.client
     .register(DidChangeWatchedFilesNotification.type, {
       watchers: [{ globPattern: '**/*.component.yml' }],
@@ -52,7 +46,6 @@ export function setupWatcher(
 
     recentEventCount += changes.length;
 
-    // Reset the event-count window after 300ms of quiet
     if (recentEventWindowTimer !== null) {
       clearTimeout(recentEventWindowTimer);
     }
@@ -61,7 +54,6 @@ export function setupWatcher(
       recentEventWindowTimer = null;
     }, DEBOUNCE_MS);
 
-    // Bulk protection: many simultaneous changes trigger a single full rebuild
     if (recentEventCount > BULK_EVENT_THRESHOLD) {
       logger.info(
         `Bulk file event threshold exceeded (${recentEventCount} events). ` +
@@ -90,7 +82,6 @@ export function setupWatcher(
       return;
     }
 
-    // Per-file debounced updates
     for (const change of changes) {
       const filePath = URI.parse(change.uri).fsPath;
       const existingTimer = perFileTimers.get(filePath);
@@ -107,7 +98,6 @@ export function setupWatcher(
           logger.debug(`Removed component: ${filePath}`);
           onRegistryChange?.();
         } else {
-          // Created or Changed — re-parse and update
           registry.updateComponent(filePath).then(() => {
             onRegistryChange?.();
           }).catch((err: unknown) => {
@@ -121,7 +111,6 @@ export function setupWatcher(
     }
   });
 
-  // Return dispose function to clean up timers on shutdown
   return function dispose(): void {
     for (const timer of perFileTimers.values()) {
       clearTimeout(timer);

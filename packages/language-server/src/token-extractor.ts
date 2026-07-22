@@ -1,31 +1,25 @@
-/**
- * Pattern that matches a `provider:component` style ID token.
- * Allows letters, digits, underscores, and hyphens on both sides of the colon.
- */
+// Matches a `provider:component` style ID token.
 const COMPONENT_ID_PATTERN = /[a-z0-9_][a-z0-9_-]*:[a-z0-9_][a-z0-9_-]*/g;
 
-/**
- * Pattern that matches a `@provider/relative/path.twig` namespace path token.
- * Allows letters, digits, underscores, hyphens, dots, and slashes after the provider.
- */
+// Matches a `@provider/relative/path.twig` namespace path token.
 const NAMESPACE_PATH_PATTERN = /@[a-z0-9_-]+\/[a-z0-9_\-./]+/gi;
 
-/**
- * Describes a matched component ID token and its position within a line.
- */
+/** A matched reference token and its position within a line. */
 export interface ComponentIdToken {
+  /** The matched token text. */
   id: string;
+  /** Zero-based start offset within the line. */
   start: number;
+  /** Zero-based end offset within the line. */
   end: number;
 }
 
 /**
- * Extracts the `provider:component` token from a line of text at a given
- * character offset, along with its start/end positions within the line.
+ * Extracts the `provider:component` token spanning the cursor.
  *
  * @param lineText - Full text of the line
  * @param characterOffset - Zero-based cursor position within the line
- * @returns The matched token with position info, or `null` if no token spans the cursor
+ * @returns The matched token with position info, or null if none spans the cursor
  */
 export function extractComponentIdTokenAtOffset(
   lineText: string,
@@ -51,7 +45,7 @@ export function extractComponentIdTokenAtOffset(
  *
  * @param lineText - Full text of the line
  * @param characterOffset - Zero-based cursor position within the line
- * @returns The matched token with position info, or `null` if none spans the cursor
+ * @returns The matched token with position info, or null if none spans the cursor
  */
 export function extractNamespacePathTokenAtOffset(
   lineText: string,

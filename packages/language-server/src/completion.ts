@@ -21,77 +21,35 @@ import { SERVER_NAME } from './metadata.js';
 
 const MAX_LINE_LENGTH = 10000;
 
-/**
- * Source tag shown on every completion item's right-hand detail so the user can
- * see which language server produced the suggestion.
- */
 const SOURCE_LABEL = SERVER_NAME;
 
-/**
- * Pattern that matches the partial input of an include/embed/extends string literal.
- * Captures everything after the opening quote up to the cursor position.
- *
- * Applied against a small multiline lookback so that the include/embed/extends
- * keyword is found even when it appears on a previous line, e.g.:
- *   {% include
- *     'provider:component' %}
- */
+// Matches the partial include/embed/extends string literal up to the cursor.
 const INCLUDE_CONTEXT_PATTERN = /(?:include|embed|extends)\s*['"]([^'"]*)$/i;
 
-/**
- * Number of previous lines to include when building the multiline lookback
- * for INCLUDE_CONTEXT_PATTERN. 2 is enough for any real-world Twig include.
- */
 const INCLUDE_LOOKBACK_LINES = 2;
 
-/**
- * Comment line detection pattern for Twig comment blocks.
- */
 const COMMENT_LINE_PATTERN = /^\s*\{#/;
 
-/**
- * Early shorthand prefixes — a single character that could grow into a Twig
- * shorthand but doesn't yet match WORD_SHORTHAND_PATTERN (which requires 2 chars).
- * Returning isIncomplete:true here prevents blink.cmp from caching the empty
- * result and blocking requests once the user types the second character.
- *
- * Covers first letters of: apply, block, cache, embed/extends, filter, for/from,
- * if/include/import, macro, set, trans, use, verbatim, with.
- */
+// Matches a single leading char that could grow into a Twig shorthand;
+// returning isIncomplete:true for it keeps the client re-querying each keystroke.
 const EARLY_SHORTHAND_PREFIX = /(?<![%{-])\b([abcefimstuvw])$/i;
 
-/**
- * Matches a bare word typed on its own on a line (optional leading whitespace,
- * then 2+ word chars, nothing else up to the cursor). Used to offer
- * `{% include 'provider:component' %}` snippets when the user types a
- * component name like `video` or `hero` outside of any Twig tag.
- */
+// Matches a bare 2+ char word alone on a line.
 const BARE_COMPONENT_WORD_PATTERN = /^[ \t]*(\w{2,})$/;
 
-/**
- * Matches an include/embed tag whose component string is already closed, with
- * an optional partial word the user has started typing (e.g. `w`, `wi`, `with`).
- * Applied against `lookbackText` so the component string may span a previous line.
- * Does NOT match once a `{` is typed — at that point the invocation context
- * detector handles it (Branch 2.5).
- */
+// Matches an include/embed with a closed component string and an optional trailing partial word.
 const TAG_BODY_PATTERN = /\{%-?\s*(?:include|embed)\s+['"][^'"]+['"]\s*([\w]*)$/i;
 
 /**
- * Returns completion items for the current cursor position in a Twig document.
- *
- * Snippet branches (tag and word) run BEFORE the registry await so they are
- * never killed by the version-staleness check — they don't depend on the
- * registry and must respond on every keystroke without async delay.
- *
- * Only the component-ID branch awaits the registry.
+ * Returns completion items for the cursor position, tagged with the source label.
  *
  * @param params - LSP completion request parameters
  * @param documents - Open document store
  * @param registry - SDC component registry
  * @param logger - Structured logger
  * @param token - Cancellation token from the LSP client
- * @returns Array of completion items (never null)
+ * @param enableGenericSnippets - Whether to include generic Twig snippets
+ * @returns Completion items, or a completion list
  */
 export async function getCompletions(
   params: CompletionParams,
@@ -113,8 +71,10 @@ export async function getCompletions(
 }
 
 /**
- * Stamps every completion item with the source label so the editor shows which
- * language server produced it. Handles both plain arrays and `CompletionList`.
+ * Stamps every completion item with the source label.
+ *
+ * @param result - Completion items or list to tag
+ * @returns The same result with each item's source label set
  */
 function tagWithSource(
   result: CompletionItem[] | CompletionList,
@@ -126,6 +86,20 @@ function tagWithSource(
   return result;
 }
 
+/**
+ * Selects the appropriate completion branch for the cursor position.
+ *
+ * Snippet branches run before the registry await so they are never dropped
+ * by the version-staleness check.
+ *
+ * @param params - LSP completion request parameters
+ * @param documents - Open document store
+ * @param registry - SDC component registry
+ * @param logger - Structured logger
+ * @param token - Cancellation token from the LSP client
+ * @param enableGenericSnippets - Whether to include generic Twig snippets
+ * @returns Completion items, or a completion list
+ */
 async function collectCompletions(
   params: CompletionParams,
   documents: TextDocuments<TextDocument>,
@@ -154,16 +128,8 @@ async function collectCompletions(
   const lineAfterCursor = fullLine.slice(cursorChar);
   const cursorOffset = doc.offsetAt(params.position);
 
-  // ------------------------------------------------------------------
-  // Invocation context guard — runs FIRST, before any snippet branch.
-  // If the cursor is inside a `with {}` block we must never reach the
-  // tag-snippet or word-shorthand branches; typing `fo` as a prop value
-  // must not trigger the `for / endfor` shorthand.
-  // ------------------------------------------------------------------
   const invocationCtx = detectInvocationContext(fullText, cursorOffset);
   if (invocationCtx !== null) {
-    // At value position (after `key:`) — nothing useful to offer.
-    // Twig variable scope resolution is out of scope for this LSP.
     if (/[\w-]+\s*:\s*$/.test(lineUpToCursor)) return [];
 
     const versionForProps = doc.version;
@@ -174,27 +140,14 @@ async function collectCompletions(
     return buildPropCompletions(invocationCtx, registry, logger);
   }
 
-  // Multiline lookback — built once, reused by Branch 1.5 and Branch 3.
-  // Only computed when we are NOT inside a `with {}` block.
   const lookbackLines = lines
     .slice(Math.max(0, lineNumber - INCLUDE_LOOKBACK_LINES), lineNumber)
     .concat([lineUpToCursor]);
   const lookbackText = lookbackLines.join('\n');
 
-  // ------------------------------------------------------------------
-  // Branch 1: inside `{%` tag opener — Twig tag snippets
-  // Runs synchronously, no await, no staleness risk.
-  // ------------------------------------------------------------------
   const tagSnippets = getTwigTagSnippets(lineUpToCursor, lineAfterCursor, lineNumber, enableGenericSnippets);
   if (tagSnippets.length > 0) return tagSnippets;
 
-  // ------------------------------------------------------------------
-  // Branch 1.5: tag-body `with { }` completion — cursor after the
-  // component string of an include/embed, before any `{` is typed.
-  // Intercepts before Branch 2 so `wi` here does not fall through to
-  // the generic `with / endwith` word shorthand.
-  // Synchronous — no registry needed.
-  // ------------------------------------------------------------------
   const tagBodyMatch = TAG_BODY_PATTERN.exec(lookbackText);
   if (tagBodyMatch !== null) {
     const partialTyped = tagBodyMatch[1] ?? '';
@@ -203,9 +156,7 @@ async function collectCompletions(
       Position.create(lineNumber, wordStart),
       params.position,
     );
-    // isIncomplete:true forces a re-query on every keystroke so blink.cmp's
-    // cache never hides this item. filterText is always 'with' so the item
-    // stays visible as the user types w → wi → wit → with.
+    // isIncomplete:true forces a re-query each keystroke so the client cache never hides this item.
     return CompletionList.create([{
       label: 'with { }',
       kind: CompletionItemKind.Keyword,
@@ -217,31 +168,15 @@ async function collectCompletions(
     }], true);
   }
 
-  // ------------------------------------------------------------------
-  // Branch 2: bare word shorthand (incl, emb, ext…) — word snippets
-  // Also synchronous — must run before the registry await.
-  // Returns isIncomplete:true so blink.cmp never caches these and always
-  // re-requests as the user continues typing.
-  // ------------------------------------------------------------------
   const wordSnippets = getTwigWordSnippets(lineUpToCursor, lineNumber, enableGenericSnippets);
   if (wordSnippets.length > 0) {
     return CompletionList.create(wordSnippets, true);
   }
 
-  // Early shorthand prefix (e.g. `i`, `in`, `e`, `em`) — pattern not matched
-  // yet but could grow into one. Signal incomplete to break blink.cmp's cache
-  // so the next keystroke gets a fresh request rather than filtering empty.
   if (EARLY_SHORTHAND_PREFIX.test(lineUpToCursor)) {
     return CompletionList.create([], true);
   }
 
-  // ------------------------------------------------------------------
-  // Branch 2.7: bare-word component name search
-  // Fires when the line contains only optional whitespace + a 2+ char word
-  // that didn't match any Twig shorthand. Lets the user type a component
-  // name (e.g. `video`) and receive `{% include 'provider:video' %}` snippets
-  // without first having to type `{% include '`.
-  // ------------------------------------------------------------------
   const bareWordMatch = BARE_COMPONENT_WORD_PATTERN.exec(lineUpToCursor);
   if (bareWordMatch !== null) {
     const query = bareWordMatch[1];
@@ -261,11 +196,6 @@ async function collectCompletions(
     );
   }
 
-  // ------------------------------------------------------------------
-  // Branch 3: inside a string literal after include/embed/extends.
-  // Handles both `provider:component` IDs and `@namespace/path.twig` paths.
-  // Needs the registry — await + staleness guard applies here only.
-  // ------------------------------------------------------------------
   const contextMatch = INCLUDE_CONTEXT_PATTERN.exec(lookbackText);
   if (contextMatch === null) return [];
 
@@ -289,12 +219,12 @@ async function collectCompletions(
 /**
  * Builds completion items for SDC component IDs.
  *
- * @param partialInput - The text already typed inside the string literal
- * @param params - LSP completion params (for position info)
+ * @param partialInput - Text already typed inside the string literal
+ * @param params - LSP completion params
  * @param doc - The current text document
  * @param registry - SDC component registry
  * @param logger - Structured logger
- * @returns Array of component ID completion items
+ * @returns Component ID completion items
  */
 function buildComponentIdCompletions(
   partialInput: string,
@@ -329,9 +259,11 @@ function buildComponentIdCompletions(
 }
 
 /**
- * Derives the `@provider/relative/path.twig` namespace path from a component's
- * absolute twig file path and provider name. Returns `null` if the `components/`
- * directory cannot be located in the path.
+ * Derives the `@provider/relative/path.twig` namespace path for a component.
+ *
+ * @param provider - The component's provider name
+ * @param twigFilePath - Absolute path to the component's twig file
+ * @returns The namespace path, or null if `components/` is not in the path
  */
 function buildNamespacePath(provider: string, twigFilePath: string): string | null {
   const segments = twigFilePath.split(path.sep);
@@ -343,12 +275,12 @@ function buildNamespacePath(provider: string, twigFilePath: string): string | nu
 /**
  * Builds completion items for `@namespace/path.twig` style includes.
  *
- * @param partialInput - The text already typed (starts with `@`)
+ * @param partialInput - Text already typed (starts with `@`)
  * @param params - LSP completion params
  * @param doc - The current text document
  * @param registry - SDC component registry
  * @param logger - Structured logger
- * @returns Array of namespace path completion items
+ * @returns Namespace path completion items
  */
 function buildNamespaceCompletions(
   partialInput: string,
@@ -405,15 +337,14 @@ function buildNamespaceCompletions(
 }
 
 /**
- * Builds completion items for props and slots of the component being invoked
- * inside a Twig `include/embed ... with { }` block.
+ * Builds completion items for the props and slots of an invoked component.
  *
- * Required props sort before optional ones. Keys already typed are excluded.
+ * Required props sort before optional ones, and already-used keys are excluded.
  *
- * @param ctx - The detected invocation context (component ID + used keys)
+ * @param ctx - The detected invocation context
  * @param registry - SDC component registry
  * @param logger - Structured logger
- * @returns Array of prop/slot completion items
+ * @returns Prop and slot completion items
  */
 function buildPropCompletions(
   ctx: InvocationContext,
@@ -467,9 +398,7 @@ function buildPropCompletions(
 }
 
 /**
- * Builds `{% include %}` and `{% include with {} %}` snippets for components
- * whose ID or name matches `query` (case-insensitive substring).
- * Used by the bare-word typing branch so `video` → `{% include 'numiko:video' %}`.
+ * Builds include snippets for components matching a bare-word query.
  *
  * @param query - The bare word the user typed
  * @param replaceRange - Range covering the typed word
@@ -489,14 +418,9 @@ function buildBareWordComponentCompletions(
     return [];
   }
 
-  // filterText is always the raw query the user typed.
-  // This means the server owns all filtering (via registry.search / path substring
-  // check above) and blink.cmp's client-side prefix filter never hides items whose
-  // full ID or path doesn't happen to start with the typed word.
   const items: CompletionItem[] = [];
 
   for (const component of matches) {
-    // Component-ID form: {% include 'provider:component' %}
     items.push({
       label: `{% include '${component.id}' %}`,
       kind: CompletionItemKind.Snippet,
@@ -516,7 +440,6 @@ function buildBareWordComponentCompletions(
       insertTextFormat: InsertTextFormat.Snippet,
     });
 
-    // Namespace-path form: {% include '@provider/path/component.twig' %}
     if (component.twigFilePath !== null) {
       const namespacePath = buildNamespacePath(component.provider, component.twigFilePath);
       if (namespacePath !== null) {
@@ -542,7 +465,6 @@ function buildBareWordComponentCompletions(
     }
   }
 
-  // Non-SDC standalone template files whose namespace path contains the query
   const lowerQuery = query.toLowerCase();
   for (const entry of registry.getAllTwigEntries()) {
     if (!entry.namespacePath.toLowerCase().includes(lowerQuery)) continue;
@@ -561,14 +483,11 @@ function buildBareWordComponentCompletions(
 }
 
 /**
- * Resolves a completion item by populating its full documentation.
- *
- * Called by the LSP client after the user highlights a completion item.
- * The `item.data` field must contain the component ID string.
+ * Resolves a completion item by populating its documentation from `item.data`.
  *
  * @param item - The completion item to resolve
  * @param registry - SDC component registry
- * @returns The same item with `documentation` populated
+ * @returns The same item with documentation populated
  */
 export function resolveCompletion(item: CompletionItem, registry: SDCRegistry): CompletionItem {
   const componentId = typeof item.data === 'string' ? item.data : null;

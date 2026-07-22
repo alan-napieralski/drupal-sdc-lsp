@@ -19,6 +19,7 @@ const COMPONENT_REFERENCE_PATTERN =
   /\{%-?\s*(?:include|embed)\s+['"]([a-z0-9_][a-z0-9_-]*:[a-z0-9_][a-z0-9_-]*)['"]/gi;
 
 /**
+<<<<<<< Updated upstream
  * Matches Twig comment blocks and verbatim blocks, whose contents Twig never
  * executes. Component references inside these ranges must not be diagnosed.
  *
@@ -52,12 +53,15 @@ function isWithinAnyRange(offset: number, ranges: OffsetRange[]): boolean {
 /**
  * Scans a Twig document for SDC component references and returns a diagnostic
  * for every component ID that is not present in the registry.
+=======
+ * Returns a diagnostic for every referenced component ID absent from the registry.
+>>>>>>> Stashed changes
  *
- * This function is synchronous and pure — call it only after the registry is ready.
+ * Call only after the registry is ready.
  *
  * @param document - The open text document to validate
  * @param registry - A fully built SDC registry
- * @returns Array of LSP diagnostics (empty if all referenced components are known)
+ * @returns LSP diagnostics, empty if all referenced components are known
  */
 export function getDiagnostics(document: TextDocument, registry: SDCRegistry): Diagnostic[] {
   const text = document.getText();
@@ -78,7 +82,6 @@ export function getDiagnostics(document: TextDocument, registry: SDCRegistry): D
       continue;
     }
 
-    // Offset of the component ID within the full document text
     const idStart = match.index + match[0].indexOf(componentId);
     const idEnd = idStart + componentId.length;
 
